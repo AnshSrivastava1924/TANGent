@@ -52,44 +52,86 @@
             <small id="providerLabel">Connecting market data...</small>
           </span>
         </button>
+        <div class="primary-nav" aria-label="Primary navigation">
+          <button class="nav-item active" type="button" data-nav-page="home">Dashboard</button>
+          <button class="nav-item" type="button" data-nav-page="overview">Markets</button>
+          <button class="nav-item" type="button" data-nav-page="portfolio">Portfolio</button>
+          <button class="nav-item" type="button" data-nav-page="watchlist">Watchlist</button>
+          <button class="nav-item" type="button" data-nav-page="buddy">Buddy</button>
+        </div>
         <div class="toolbar">
-          <button class="icon-button" id="refreshButton" title="Refresh data">Refresh</button>
+          <button class="icon-button" id="themeButton" type="button" title="Switch color theme" aria-label="Switch color theme">Theme</button>
+          <button class="icon-button" id="refreshButton" type="button" title="Refresh data">Refresh</button>
           <button class="secondary-action" id="logoutButton">Log out</button>
         </div>
       </nav>
 
       <section class="home-view view active" id="homeView">
-        <div class="market-command">
-          <div>
-            <p class="eyebrow">Market workspace</p>
-            <h2>Choose the lens you want to open.</h2>
+        <div class="dashboard-hero">
+          <div class="hero-copy">
+            <p class="eyebrow">Financial command center</p>
+            <h2 id="welcomeTitle">Welcome back.</h2>
+            <p id="welcomeSubtitle">Your portfolio, spending, and market watchlist in one clear view.</p>
+          </div>
+          <div class="market-status-pill">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="homeProviderLabel">Connecting to market data</span>
           </div>
         </div>
+        <div class="portfolio-grid dashboard-summary" id="homeSummaryGrid" aria-live="polite"></div>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Workspace</p>
+            <h3>What would you like to review?</h3>
+          </div>
+          <p>Every module uses the same secure account and MySQL-backed data.</p>
+        </div>
         <div class="module-grid">
-          <button class="module-card" data-page="overview">
+          <button class="module-card module-market" data-page="overview">
+            <span class="module-icon" aria-hidden="true">↗</span>
             <strong>Overview</strong>
             <span>Browse major stocks, search any ticker, and plot selected price charts.</span>
           </button>
-          <button class="module-card" data-page="compare">
+          <button class="module-card module-compare" data-page="compare">
+            <span class="module-icon" aria-hidden="true">≋</span>
             <strong>Compare</strong>
             <span>Normalize multiple stocks on one graph to study relative performance.</span>
           </button>
-          <button class="module-card" data-page="news">
+          <button class="module-card module-news" data-page="news">
+            <span class="module-icon" aria-hidden="true">◫</span>
             <strong>Explore News</strong>
             <span>Read dynamic general market headlines from the configured news provider.</span>
           </button>
-          <button class="module-card" data-page="portfolio">
+          <button class="module-card module-portfolio" data-page="portfolio">
+            <span class="module-icon" aria-hidden="true">◎</span>
             <strong>Portfolio</strong>
             <span>Review total wealth across investments, housing, income, debts, and insurance value.</span>
           </button>
-          <button class="module-card" data-page="watchlist">
+          <button class="module-card module-watchlist" data-page="watchlist">
+            <span class="module-icon" aria-hidden="true">★</span>
             <strong>Watchlist</strong>
             <span>Track only saved symbols and open charts directly from your list.</span>
           </button>
-          <button class="module-card" data-page="buddy">
+          <button class="module-card module-buddy" data-page="buddy">
+            <span class="module-icon" aria-hidden="true">✓</span>
             <strong>Buddy</strong>
             <span>Track daily spending, categories, and recent expense history.</span>
           </button>
+        </div>
+        <div class="home-lower-grid">
+          <section class="quick-panel">
+            <div class="section-heading compact-heading">
+              <div><p class="eyebrow">Saved securities</p><h3>Watchlist snapshot</h3></div>
+              <button class="text-action" type="button" data-page="watchlist">View all</button>
+            </div>
+            <div class="quick-watchlist" id="homeWatchlistPreview"></div>
+          </section>
+          <section class="quick-panel financial-health-panel">
+            <div class="section-heading compact-heading">
+              <div><p class="eyebrow">Portfolio health</p><h3>Diversification overview</h3></div>
+            </div>
+            <div id="homeAllocationPreview"></div>
+          </section>
         </div>
       </section>
 
@@ -100,7 +142,10 @@
             <h2>Major stocks and selected charts.</h2>
           </div>
           <form class="symbol-form" id="symbolForm">
-            <input id="symbolInput" placeholder="AAPL" value="AAPL" aria-label="Ticker symbol">
+            <div class="search-field">
+              <input id="symbolInput" placeholder="Search ticker" value="AAPL" aria-label="Ticker symbol" autocomplete="off" aria-controls="symbolSuggestions" aria-expanded="false">
+              <div class="suggestion-menu hidden" id="symbolSuggestions" role="listbox"></div>
+            </div>
             <select id="rangeSelect" aria-label="Chart range">
               <option value="1mo">1M</option>
               <option value="3mo" selected>3M</option>
@@ -110,6 +155,7 @@
             <button class="primary-action" type="submit">Analyze</button>
           </form>
         </div>
+        <p class="inline-status" id="overviewStatus" role="status" aria-live="polite"></p>
         <div class="stock-grid" id="majorStockGrid"></div>
         <div class="quote-grid">
           <article class="metric-card">
@@ -278,9 +324,13 @@
           </div>
           <div class="watchlist-actions">
             <form id="watchlistForm" class="compare-form">
-              <label>Add ticker symbol
-                <input id="watchlistInput" placeholder="TSLA" aria-label="Watchlist ticker symbol" autocomplete="off">
-              </label>
+              <div class="form-field">
+                <label for="watchlistInput">Add ticker symbol</label>
+                <div class="search-field">
+                  <input id="watchlistInput" placeholder="Search ticker or company" aria-label="Watchlist ticker symbol" autocomplete="off" aria-controls="watchlistSuggestions" aria-expanded="false">
+                  <div class="suggestion-menu hidden" id="watchlistSuggestions" role="listbox"></div>
+                </div>
+              </div>
               <button class="primary-action" type="submit">Add</button>
             </form>
             <p class="form-note watchlist-status" id="watchlistStatus" role="status" aria-live="polite">Enter a ticker such as IBM or TSLA.</p>
@@ -299,6 +349,7 @@
       </section>
     </section>
   </main>
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <script src="app.js"></script>
 </body>
 </html>

@@ -1,4 +1,6 @@
 const state = {
+  user: null,
+  config: null,
   symbol: "AAPL",
   watchSymbol: "AAPL",
   range: "3mo",
@@ -110,8 +112,10 @@ const state = {
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const number = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 let authMode = "login";
+const searchTimers = new Map();
 
 document.addEventListener("DOMContentLoaded", () => {
+  initializeTheme();
   bindAuth();
   bindShell();
   loadConfig();
@@ -157,16 +161,36 @@ function bindShell() {
     document.getElementById("dashboard").classList.add("hidden");
     document.getElementById("authView").classList.remove("hidden");
   });
-  document.getElementById("refreshButton").addEventListener("click", () => refreshActivePage());
+  document.getElementById("themeButton").addEventListener("click", toggleTheme);
+  document.getElementById("refreshButton").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      await refreshActivePage();
+      showToast("Page refreshed", "success");
+    } catch (error) {
+      showToast(error.message, "error");
+    } finally {
+      button.disabled = false;
+    }
+  });
 
-  document.querySelectorAll(".module-card").forEach((card) => {
+  document.querySelectorAll("[data-page]").forEach((card) => {
     card.addEventListener("click", () => showPage(card.dataset.page));
   });
+
+  document.querySelectorAll("[data-nav-page]").forEach((button) => {
+    button.addEventListener("click", () => showPage(button.dataset.navPage));
+  });
+
+  bindTickerSearch("symbolInput", "symbolSuggestions");
+  bindTickerSearch("watchlistInput", "watchlistSuggestions");
 
   document.getElementById("symbolForm").addEventListener("submit", (event) => {
     event.preventDefault();
     state.symbol = cleanSymbol(document.getElementById("symbolInput").value, "AAPL");
     state.range = document.getElementById("rangeSelect").value;
+    hideSuggestions("symbolInput", "symbolSuggestions");
     loadOverviewStock(state.symbol);
   });
 
@@ -182,6 +206,7 @@ function bindShell() {
     const status = document.getElementById("watchlistStatus");
     const button = form.querySelector('button[type="submit"]');
     const symbol = cleanSymbol(input.value, "");
+    hideSuggestions("watchlistInput", "watchlistSuggestions");
 
     if (!symbol) {
       status.textContent = "Enter a valid ticker symbol.";
@@ -210,8 +235,10 @@ function bindShell() {
       status.textContent = chart.status === "fulfilled"
         ? `${symbol} was added to your watchlist.`
         : `${symbol} was saved; its chart is temporarily unavailable.`;
+      showToast(`${symbol} added to your watchlist`, "success");
     } catch (error) {
       status.textContent = `Could not add ${symbol}: ${error.message}`;
+      showToast(`Could not add ${symbol}`, "error");
     } finally {
       button.disabled = false;
     }
@@ -231,6 +258,14 @@ function bindShell() {
     document.getElementById("expenseName").value = "";
     document.getElementById("expenseAmount").value = "50";
     renderBuddy();
+    showToast("Expense added", "success");
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".search-field")) {
+      hideSuggestions("symbolInput", "symbolSuggestions");
+      hideSuggestions("watchlistInput", "watchlistSuggestions");
+    }
   });
 }
 
@@ -250,6 +285,7 @@ async function openDashboard() {
 
 async function loadAppData() {
   const data = await getJson("/api/app/bootstrap");
+  state.user = data.user || null;
   state.portfolioClasses = data.portfolioClasses || [];
   state.expenses = data.expenses || [];
   state.watchlist = data.watchlist?.length ? data.watchlist : [];
@@ -257,14 +293,30 @@ async function loadAppData() {
 }
 
 async function loadConfig() {
-  const data = await getJson("/api/config");
-  document.getElementById("providerLabel").textContent = `${data.realtimeProvider} market feed`;
+  try {
+    const data = await getJson("/api/config");
+    state.config = data;
+    const label = `${data.realtimeProvider} market feed`;
+    document.getElementById("providerLabel").textContent = label;
+    document.getElementById("homeProviderLabel").textContent = label;
+  } catch (_) {
+    document.getElementById("providerLabel").textContent = "Market feed unavailable";
+    document.getElementById("homeProviderLabel").textContent = "Market feed unavailable";
+  }
 }
 
 function showPage(page) {
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
   document.getElementById(`${page}View`).classList.add("active");
-  refreshActivePage(page);
+  const navPage = ["compare", "news"].includes(page) ? "overview" : page;
+  document.querySelectorAll("[data-nav-page]").forEach((button) => {
+    const active = button.dataset.navPage === navPage;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  refreshActivePage(page).catch((error) => showToast(error.message, "error"));
 }
 
 function activePage() {
@@ -272,6 +324,7 @@ function activePage() {
 }
 
 async function refreshActivePage(page = activePage()) {
+  if (page === "home") await renderHomeDashboard();
   if (page === "overview") {
     await renderMajorStocks();
     await loadOverviewStock(state.symbol);
@@ -284,6 +337,70 @@ async function refreshActivePage(page = activePage()) {
     await renderWatchlist();
     await loadWatchlistChart(state.watchSymbol || state.watchlist[0]);
   }
+}
+
+async function renderHomeDashboard() {
+  const totals = portfolioTotals();
+  const firstName = state.user?.fullName?.trim().split(/\s+/)[0] || "Investor";
+  document.getElementById("welcomeTitle").textContent = `Welcome back, ${firstName}.`;
+  document.getElementById("welcomeSubtitle").textContent =
+    `${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} · Your financial picture is ready.`;
+
+  const grid = document.getElementById("homeSummaryGrid");
+  grid.innerHTML = "";
+  const savingsRate = totals.income > 0 ? Math.min(100, (totals.liquid / totals.income) * 10) : 0;
+  [
+    ["Net worth", totals.netWorth, "Assets after liabilities", "money"],
+    ["Invested assets", totals.assets, `${totals.classes.filter((item) => !item.isLiability && item.total > 0).length} active asset classes`, "money"],
+    ["Annual income", totals.income, "Across all income sources", "money"],
+    ["Watchlist", state.watchlist.length, "Saved market symbols", "number"]
+  ].forEach(([label, value, note, format]) => {
+    const card = document.createElement("article");
+    card.className = "metric-card senior-metric";
+    card.innerHTML = `<span>${label}</span><strong>${format === "money" ? money.format(value) : number.format(value)}</strong><small>${note}</small>`;
+    grid.appendChild(card);
+  });
+
+  const allocation = document.getElementById("homeAllocationPreview");
+  const debtRatio = totals.assets > 0 ? Math.min(100, (totals.liabilities / totals.assets) * 100) : 0;
+  const healthScore = Math.max(0, Math.round(100 - debtRatio));
+  allocation.innerHTML = `
+    <div class="health-stat"><strong>${healthScore}</strong><span>Financial health score</span></div>
+    <div class="health-bar" aria-label="Financial health score ${healthScore} out of 100"><span style="width:${healthScore}%"></span></div>
+    <p class="health-copy">${number.format(debtRatio)}% debt-to-asset ratio · ${number.format(savingsRate)}% liquidity coverage indicator.</p>
+  `;
+
+  await renderHomeWatchlist();
+}
+
+async function renderHomeWatchlist() {
+  const preview = document.getElementById("homeWatchlistPreview");
+  const symbols = state.watchlist.slice(0, 3);
+  if (!symbols.length) {
+    preview.innerHTML = '<div class="empty-state">Add a ticker to start your watchlist.</div>';
+    return;
+  }
+  preview.innerHTML = symbols.map((symbol) => `
+    <div class="quick-symbol skeleton"><div><strong>${escapeHtml(symbol)}</strong><small>Loading quote</small></div></div>
+  `).join("");
+  const results = await Promise.allSettled(symbols.map((symbol) => getJson(`/api/market/quote/${encodeURIComponent(symbol)}`)));
+  preview.innerHTML = "";
+  results.forEach((result, index) => {
+    const symbol = symbols[index];
+    const row = document.createElement("div");
+    row.className = "quick-symbol";
+    if (result.status === "fulfilled") {
+      const quote = result.value;
+      const change = finiteNumber(quote.changePercent);
+      row.innerHTML = `
+        <div><strong>${escapeHtml(symbol)}</strong><small>${escapeHtml(formatFreshness(quote.freshness))}</small></div>
+        <div class="${change >= 0 ? "positive" : "negative"}"><strong>${money.format(finiteNumber(quote.price))}</strong><small>${change >= 0 ? "+" : ""}${change.toFixed(2)}%</small></div>
+      `;
+    } else {
+      row.innerHTML = `<div><strong>${escapeHtml(symbol)}</strong><small>Quote temporarily unavailable</small></div>`;
+    }
+    preview.appendChild(row);
+  });
 }
 
 function renderBuddy() {
@@ -350,30 +467,46 @@ function renderExpenseHistory() {
 
 async function renderMajorStocks() {
   const grid = document.getElementById("majorStockGrid");
-  grid.innerHTML = "";
+  grid.innerHTML = state.majorStocks.map((symbol) => `
+    <article class="stock-card skeleton"><span>Loading market quote</span><strong>${symbol}</strong><small>One moment</small></article>
+  `).join("");
   const quotes = await quoteMany(state.majorStocks);
+  grid.innerHTML = "";
   quotes.forEach((quote) => grid.appendChild(stockCard(quote, () => {
     state.symbol = quote.symbol;
     document.getElementById("symbolInput").value = quote.symbol;
     loadOverviewStock(quote.symbol);
   })));
+  if (!quotes.length) grid.innerHTML = '<div class="empty-state">Market quotes are temporarily unavailable. Your portfolio data is unaffected.</div>';
 }
 
 async function loadOverviewStock(symbol) {
   state.symbol = cleanSymbol(symbol, "AAPL");
   document.getElementById("symbolInput").value = state.symbol;
   document.getElementById("chartTitle").textContent = `${state.symbol} trend`;
-  const [quote, history] = await Promise.all([
-    getJson(`/api/market/quote/${encodeURIComponent(state.symbol)}`),
-    getJson(`/api/market/history/${encodeURIComponent(state.symbol)}?range=${state.range}`)
-  ]);
-  renderQuoteMetrics(quote);
-  document.getElementById("chartProvider").textContent = marketSource(history, "price history");
-  renderLineChart("priceChart", history.bars || [], [
-    { label: "Close", key: "close", color: "#007aff", fill: true },
-    { label: "High", key: "high", color: "#30d158" },
-    { label: "Low", key: "low", color: "#ff3b30" }
-  ], "Price");
+  const status = document.getElementById("overviewStatus");
+  const submit = document.querySelector('#symbolForm button[type="submit"]');
+  submit.disabled = true;
+  status.textContent = `Loading ${state.symbol} from the market provider...`;
+  try {
+    const [quote, history] = await Promise.all([
+      getJson(`/api/market/quote/${encodeURIComponent(state.symbol)}`),
+      getJson(`/api/market/history/${encodeURIComponent(state.symbol)}?range=${state.range}`)
+    ]);
+    renderQuoteMetrics(quote);
+    document.getElementById("chartProvider").textContent = marketSource(history, "price history");
+    status.textContent = `${state.symbol} updated · ${marketSource(quote, "")}`;
+    renderLineChart("priceChart", history.bars || [], [
+      { label: "Close", key: "close", color: "#007aff", fill: true },
+      { label: "High", key: "high", color: "#30d158" },
+      { label: "Low", key: "low", color: "#ff3b30" }
+    ], "Price");
+  } catch (error) {
+    status.textContent = `Could not load ${state.symbol}: ${error.message}`;
+    showToast(`Market data unavailable for ${state.symbol}`, "error");
+  } finally {
+    submit.disabled = false;
+  }
 }
 
 function renderQuoteMetrics(quote) {
@@ -394,10 +527,18 @@ function renderQuoteMetrics(quote) {
 }
 
 async function loadNews() {
-  const news = await getJson("/api/market/news");
+  const list = document.getElementById("newsList");
+  list.innerHTML = Array.from({ length: 6 }, () => '<article class="news-card skeleton"><small>Loading</small><h4>Market headline</h4><p>Fetching the latest provider news.</p></article>').join("");
+  let news;
+  try {
+    news = await getJson("/api/market/news");
+  } catch (error) {
+    list.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    document.getElementById("newsProvider").textContent = "News unavailable";
+    return;
+  }
   document.getElementById("newsProvider").textContent = `${news.provider} explore`;
   document.getElementById("newsTitle").textContent = "General market headlines";
-  const list = document.getElementById("newsList");
   list.innerHTML = "";
   (news.articles || []).forEach((article) => {
     const card = document.createElement("article");
@@ -410,6 +551,7 @@ async function loadNews() {
     `;
     list.appendChild(card);
   });
+  if (!news.articles?.length) list.innerHTML = '<div class="empty-state">No current market headlines were returned.</div>';
 }
 
 async function loadComparison() {
@@ -552,11 +694,15 @@ function renderAssetClassDetails(totals) {
 async function renderWatchlist() {
   const grid = document.getElementById("watchlistGrid");
   grid.innerHTML = "";
+  if (!state.watchlist.length) {
+    grid.innerHTML = '<div class="empty-state"><strong>Your watchlist is empty.</strong><br>Search for a ticker above to add your first security.</div>';
+    return;
+  }
   const requests = state.watchlist.map((symbol) => {
     const card = savedStockCard(symbol);
     grid.appendChild(card);
     return getJson(`/api/market/quote/${encodeURIComponent(symbol)}`)
-      .then((quote) => card.replaceWith(stockCard(quote, () => loadWatchlistChart(quote.symbol))))
+      .then((quote) => card.replaceWith(watchlistStockCard(quote)))
       .catch(() => {
         card.querySelector("span").textContent = "Saved · quote unavailable";
         card.querySelector("small").textContent = "Click to retry the chart";
@@ -566,28 +712,69 @@ async function renderWatchlist() {
 }
 
 function savedStockCard(symbol) {
-  const card = document.createElement("button");
-  card.className = "stock-card";
-  card.type = "button";
+  const card = document.createElement("article");
+  card.className = "watchlist-card skeleton";
   card.innerHTML = `
     <span>Saved · loading quote</span>
     <strong>${escapeHtml(symbol)}</strong>
     <small>Loading market data...</small>
   `;
-  card.addEventListener("click", () => loadWatchlistChart(symbol));
   return card;
+}
+
+function watchlistStockCard(quote) {
+  const card = document.createElement("article");
+  const change = finiteNumber(quote.changePercent);
+  card.className = "watchlist-card";
+  card.innerHTML = `
+    <button class="watchlist-card-main" type="button">
+      <span>${escapeHtml(marketSource(quote, "quote"))}</span>
+      <strong>${escapeHtml(quote.symbol)} · ${money.format(finiteNumber(quote.price))}</strong>
+      <small class="${change >= 0 ? "positive" : "negative"}">${change >= 0 ? "+" : ""}${change.toFixed(2)}%</small>
+    </button>
+    <div class="watchlist-card-actions">
+      <small>Open chart</small>
+      <button class="remove-action" type="button" aria-label="Remove ${escapeAttribute(quote.symbol)} from watchlist">Remove</button>
+    </div>
+  `;
+  card.querySelector(".watchlist-card-main").addEventListener("click", () => loadWatchlistChart(quote.symbol));
+  card.querySelector(".remove-action").addEventListener("click", () => removeWatchlistSymbol(quote.symbol));
+  return card;
+}
+
+async function removeWatchlistSymbol(symbol) {
+  const status = document.getElementById("watchlistStatus");
+  status.textContent = `Removing ${symbol}...`;
+  try {
+    await apiJson(`/api/app/watchlist/${encodeURIComponent(symbol)}`, { method: "DELETE" });
+    state.watchlist = state.watchlist.filter((item) => item !== symbol);
+    state.watchSymbol = state.watchlist[0] || "AAPL";
+    await renderWatchlist();
+    status.textContent = `${symbol} removed from your watchlist.`;
+    showToast(`${symbol} removed`, "success");
+    if (state.watchlist.length) await loadWatchlistChart(state.watchSymbol);
+  } catch (error) {
+    status.textContent = `Could not remove ${symbol}: ${error.message}`;
+    showToast(`Could not remove ${symbol}`, "error");
+  }
 }
 
 async function loadWatchlistChart(symbol) {
   state.watchSymbol = cleanSymbol(symbol, state.watchlist[0] || "AAPL");
-  const history = await getJson(`/api/market/history/${encodeURIComponent(state.watchSymbol)}?range=${state.range}`);
-  document.getElementById("watchChartProvider").textContent = marketSource(history, "price history");
-  document.getElementById("watchChartTitle").textContent = `${state.watchSymbol} trend`;
-  renderLineChart("watchChart", history.bars || [], [
-    { label: "Close", key: "close", color: "#007aff", fill: true },
-    { label: "High", key: "high", color: "#30d158" },
-    { label: "Low", key: "low", color: "#ff3b30" }
-  ], "Price");
+  document.getElementById("watchChartProvider").textContent = "Loading market history...";
+  try {
+    const history = await getJson(`/api/market/history/${encodeURIComponent(state.watchSymbol)}?range=${state.range}`);
+    document.getElementById("watchChartProvider").textContent = marketSource(history, "price history");
+    document.getElementById("watchChartTitle").textContent = `${state.watchSymbol} trend`;
+    renderLineChart("watchChart", history.bars || [], [
+      { label: "Close", key: "close", color: "#007aff", fill: true },
+      { label: "High", key: "high", color: "#30d158" },
+      { label: "Low", key: "low", color: "#ff3b30" }
+    ], "Price");
+  } catch (error) {
+    document.getElementById("watchChartProvider").textContent = `Chart unavailable · ${error.message}`;
+    throw error;
+  }
 }
 
 async function quoteMany(symbols) {
@@ -613,6 +800,12 @@ function stockCard(quote, onSelect) {
 
 function renderLineChart(canvasId, bars, datasetSpecs, yTitle) {
   const canvas = document.getElementById(canvasId);
+  if (!bars.length) {
+    if (state.charts[canvasId]) state.charts[canvasId].destroy();
+    delete state.charts[canvasId];
+    drawEmptyChart(canvas, "No chart data available");
+    return;
+  }
   const labels = bars.map(labelForBar);
   const datasets = datasetSpecs.map((spec) => ({
     label: spec.label,
@@ -633,6 +826,22 @@ function renderLineChart(canvasId, bars, datasetSpecs, yTitle) {
     data: { labels, datasets },
     options: chartOptions(yTitle)
   });
+}
+
+function drawEmptyChart(canvas, message) {
+  const width = canvas.parentElement.clientWidth || 700;
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = width * ratio;
+  canvas.height = 300 * ratio;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = "300px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(ratio, ratio);
+  ctx.clearRect(0, 0, width, 300);
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--color-text-secondary").trim();
+  ctx.font = "600 14px -apple-system, BlinkMacSystemFont, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(message, width / 2, 150);
 }
 
 function renderPieChart(canvasId, labels, values) {
@@ -778,6 +987,92 @@ function drawFallbackPie(canvas, labels, values, colors) {
 function drawFallbackBars(canvas, labels, values, yTitle) {
   const bars = labels.map((label, index) => ({ label, value: finiteNumber(values[index]) }));
   drawFallbackChart(canvas, labels, [{ label: yTitle, data: bars.map((bar) => bar.value), borderColor: "#007aff" }], yTitle);
+}
+
+function bindTickerSearch(inputId, menuId) {
+  const input = document.getElementById(inputId);
+  const menu = document.getElementById(menuId);
+  input.addEventListener("input", () => {
+    const query = input.value.trim();
+    clearTimeout(searchTimers.get(inputId));
+    if (query.length < 1) {
+      hideSuggestions(inputId, menuId);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      menu.classList.remove("hidden");
+      menu.innerHTML = '<div class="suggestion-item skeleton">Searching market symbols...</div>';
+      input.setAttribute("aria-expanded", "true");
+      try {
+        const data = await getJson(`/api/market/search?q=${encodeURIComponent(query)}`);
+        renderTickerSuggestions(inputId, menuId, data.results || []);
+      } catch (error) {
+        menu.innerHTML = `<div class="suggestion-item">${escapeHtml(error.message)}</div>`;
+      }
+    }, 320);
+    searchTimers.set(inputId, timer);
+  });
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") hideSuggestions(inputId, menuId);
+  });
+}
+
+function renderTickerSuggestions(inputId, menuId, results) {
+  const input = document.getElementById(inputId);
+  const menu = document.getElementById(menuId);
+  menu.innerHTML = "";
+  if (!results.length) {
+    menu.innerHTML = '<div class="suggestion-item">No matching ticker found.</div>';
+    return;
+  }
+  results.slice(0, 7).forEach((result) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "suggestion-item";
+    button.setAttribute("role", "option");
+    button.innerHTML = `
+      <span><strong>${escapeHtml(result.symbol)}</strong><small>${escapeHtml(result.name || "Listed security")}</small></span>
+      <span class="suggestion-region">${escapeHtml(result.region || "")}</span>
+    `;
+    button.addEventListener("click", () => {
+      input.value = result.symbol;
+      hideSuggestions(inputId, menuId);
+      input.focus();
+    });
+    menu.appendChild(button);
+  });
+}
+
+function hideSuggestions(inputId, menuId) {
+  const input = document.getElementById(inputId);
+  const menu = document.getElementById(menuId);
+  menu.classList.add("hidden");
+  menu.innerHTML = "";
+  input.setAttribute("aria-expanded", "false");
+}
+
+function initializeTheme() {
+  const saved = localStorage.getItem("tangent-theme");
+  if (saved === "light" || saved === "dark") document.documentElement.dataset.theme = saved;
+}
+
+function toggleTheme() {
+  const current = document.documentElement.dataset.theme
+    || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const next = current === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem("tangent-theme", next);
+  showToast(`${next === "dark" ? "Dark" : "Light"} theme enabled`, "success");
+}
+
+function showToast(message, type = "info") {
+  const region = document.getElementById("toastRegion");
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  region.appendChild(toast);
+  setTimeout(() => toast.remove(), 3600);
 }
 
 async function getJson(url) {
