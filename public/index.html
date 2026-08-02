@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TANGent Portfolio Manager</title>
+  <link rel="stylesheet" href="styles.css">
+  <script async src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <section class="auth-view" id="authView">
+      <div class="brand-lockup">
+        <span class="brand-mark">T</span>
+        <div>
+          <p class="eyebrow">Portfolio intelligence</p>
+          <h1>TANGent</h1>
+        </div>
+      </div>
+      <div class="auth-panel">
+        <div class="auth-copy">
+          <p class="eyebrow">Secure workspace</p>
+          <h2>Study the market one clean view at a time.</h2>
+          <p>Sign in to open a focused workspace for market overview, stock comparison, live news, portfolio review, and your watchlist.</p>
+        </div>
+        <form id="authForm" class="auth-form">
+          <div class="segmented-control" role="tablist" aria-label="Authentication mode">
+            <button type="button" class="active" data-mode="login">Log in</button>
+            <button type="button" data-mode="signup">Sign up</button>
+          </div>
+          <label id="fullNameLabel" class="hidden">Full name
+            <input name="fullName" type="text" value="Test User" maxlength="160">
+          </label>
+          <label>Email
+            <input name="email" type="email" value="student@tangent.local" required>
+          </label>
+          <label>Password
+            <input name="password" type="password" value="training123" minlength="6" required>
+          </label>
+          <button class="primary-action" type="submit">Enter TANGent</button>
+          <p class="form-note" id="authNote">Demo login: student@tangent.local / training123</p>
+        </form>
+      </div>
+    </section>
+
+    <section class="dashboard hidden" id="dashboard">
+      <nav class="topbar">
+        <button class="brand-lockup compact nav-brand" id="homeButton" type="button">
+          <span class="brand-mark">T</span>
+          <span>
+            <strong>TANGent</strong>
+            <small id="providerLabel">Connecting market data...</small>
+          </span>
+        </button>
+        <div class="toolbar">
+          <button class="icon-button" id="refreshButton" title="Refresh data">Refresh</button>
+          <button class="secondary-action" id="logoutButton">Log out</button>
+        </div>
+      </nav>
+
+      <section class="home-view view active" id="homeView">
+        <div class="market-command">
+          <div>
+            <p class="eyebrow">Market workspace</p>
+            <h2>Choose the lens you want to open.</h2>
+          </div>
+        </div>
+        <div class="module-grid">
+          <button class="module-card" data-page="overview">
+            <strong>Overview</strong>
+            <span>Browse major stocks, search any ticker, and plot selected price charts.</span>
+          </button>
+          <button class="module-card" data-page="compare">
+            <strong>Compare</strong>
+            <span>Normalize multiple stocks on one graph to study relative performance.</span>
+          </button>
+          <button class="module-card" data-page="news">
+            <strong>Explore News</strong>
+            <span>Read dynamic general market headlines from the configured news provider.</span>
+          </button>
+          <button class="module-card" data-page="portfolio">
+            <strong>Portfolio</strong>
+            <span>Review total wealth across investments, housing, income, debts, and insurance value.</span>
+          </button>
+          <button class="module-card" data-page="watchlist">
+            <strong>Watchlist</strong>
+            <span>Track only saved symbols and open charts directly from your list.</span>
+          </button>
+          <button class="module-card" data-page="buddy">
+            <strong>Buddy</strong>
+            <span>Track daily spending, categories, and recent expense history.</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="view" id="overviewView">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Overview</p>
+            <h2>Major stocks and selected charts.</h2>
+          </div>
+          <form class="symbol-form" id="symbolForm">
+            <input id="symbolInput" placeholder="AAPL" value="AAPL" aria-label="Ticker symbol">
+            <select id="rangeSelect" aria-label="Chart range">
+              <option value="1mo">1M</option>
+              <option value="3mo" selected>3M</option>
+              <option value="6mo">6M</option>
+              <option value="1y">1Y</option>
+            </select>
+            <button class="primary-action" type="submit">Analyze</button>
+          </form>
+        </div>
+        <div class="stock-grid" id="majorStockGrid"></div>
+        <div class="quote-grid">
+          <article class="metric-card">
+            <span>Last price</span>
+            <strong id="lastPrice">--</strong>
+            <small id="priceChange">--</small>
+          </article>
+          <article class="metric-card">
+            <span>Open</span>
+            <strong id="openPrice">--</strong>
+            <small>Latest bar open</small>
+          </article>
+          <article class="metric-card">
+            <span>High / Low</span>
+            <strong id="highLow">--</strong>
+            <small>Selected session range</small>
+          </article>
+          <article class="metric-card">
+            <span>Volume</span>
+            <strong id="volume">--</strong>
+            <small>Reported shares</small>
+          </article>
+        </div>
+        <div class="chart-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow" id="chartProvider">Price history</p>
+              <h3 id="chartTitle">AAPL trend</h3>
+            </div>
+          </div>
+          <canvas id="priceChart"></canvas>
+        </div>
+      </section>
+
+      <section class="view" id="compareView">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Compare</p>
+            <h2>Study relative movement.</h2>
+          </div>
+          <form id="compareForm" class="compare-form">
+            <label>Symbols
+              <input id="compareInput" value="AAPL,MSFT,NVDA" aria-label="Comparison symbols">
+            </label>
+            <button class="primary-action" type="submit">Compare</button>
+          </form>
+        </div>
+        <div class="chart-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Normalized performance</p>
+              <h3>Stock comparison</h3>
+            </div>
+          </div>
+          <canvas id="compareChart"></canvas>
+        </div>
+      </section>
+
+      <section class="view" id="newsView">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow" id="newsProvider">Explore</p>
+            <h3 id="newsTitle">General market headlines</h3>
+          </div>
+        </div>
+        <div class="news-list" id="newsList"></div>
+      </section>
+
+      <section class="view" id="portfolioView">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Portfolio</p>
+            <h2>Retirement balance across every asset class.</h2>
+          </div>
+        </div>
+        <div class="portfolio-grid" id="portfolioSummaryGrid"></div>
+        <div class="insight-grid">
+          <div class="chart-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Asset allocation</p>
+                <h3>Overall portfolio mix</h3>
+              </div>
+            </div>
+            <canvas id="allocationChart"></canvas>
+          </div>
+          <div class="chart-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Contribution</p>
+                <h3>Value by class</h3>
+              </div>
+            </div>
+            <canvas id="classContributionChart"></canvas>
+          </div>
+          <div class="chart-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Household picture</p>
+                <h3>Assets vs debts</h3>
+              </div>
+            </div>
+            <canvas id="assetDebtChart"></canvas>
+          </div>
+        </div>
+        <div class="asset-class-list" id="assetClassList"></div>
+      </section>
+
+      <section class="view" id="buddyView">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Buddy</p>
+            <h2>Daily expense monitor.</h2>
+          </div>
+        </div>
+        <div class="portfolio-grid" id="buddySummaryGrid"></div>
+        <div class="buddy-layout">
+          <form id="expenseForm" class="entry-panel">
+            <h3>Add expense</h3>
+            <label>Description
+              <input id="expenseName" value="Groceries" required>
+            </label>
+            <label>Category
+              <select id="expenseCategory">
+                <option>Food</option>
+                <option>Health</option>
+                <option>Housing</option>
+                <option>Utilities</option>
+                <option>Transport</option>
+                <option>Family</option>
+                <option>Leisure</option>
+              </select>
+            </label>
+            <label>Amount
+              <input id="expenseAmount" type="number" min="1" step="1" value="85" required>
+            </label>
+            <button class="primary-action" type="submit">Add expense</button>
+          </form>
+          <div class="chart-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Spending split</p>
+                <h3>Expenses by category</h3>
+              </div>
+            </div>
+            <canvas id="expenseCategoryChart"></canvas>
+          </div>
+          <div class="chart-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Recent activity</p>
+                <h3>Daily spend trend</h3>
+              </div>
+            </div>
+            <canvas id="expenseTrendChart"></canvas>
+          </div>
+        </div>
+        <div class="expense-history" id="expenseHistory"></div>
+      </section>
+
+      <section class="view" id="watchlistView">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Watchlist</p>
+            <h2>Your saved stocks.</h2>
+          </div>
+          <form id="watchlistForm" class="compare-form">
+            <label>Add symbol
+              <input id="watchlistInput" placeholder="TSLA" aria-label="Watchlist symbol">
+            </label>
+            <button class="primary-action" type="submit">Add</button>
+          </form>
+        </div>
+        <div class="stock-grid" id="watchlistGrid"></div>
+        <div class="chart-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow" id="watchChartProvider">Watchlist price history</p>
+              <h3 id="watchChartTitle">AAPL trend</h3>
+            </div>
+          </div>
+          <canvas id="watchChart"></canvas>
+        </div>
+      </section>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

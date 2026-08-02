@@ -31,3 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Local-only secrets and runtime configuration
+/.env
+/.env.local
+/config/application.properties
+
+chat.txt
