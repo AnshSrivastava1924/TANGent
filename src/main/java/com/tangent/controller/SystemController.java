@@ -1,13 +1,14 @@
-package com.tangent.api;
+package com.tangent.controller;
 
+import com.tangent.dto.HealthResponse;
+import com.tangent.dto.SystemConfigResponse;
+import com.tangent.wrapper.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -25,20 +26,17 @@ public class SystemController {
     @GetMapping("/health")
     @SecurityRequirements
     @Operation(summary = "Check backend and database health", security = {})
-    public Map<String, Object> health() {
-        return Map.of("status", "UP", "service", "TANGent");
+    public ApiResponse<HealthResponse> health() {
+        return ApiResponse.success(new HealthResponse("UP", "TANGent"));
     }
 
     @GetMapping("/config")
     @SecurityRequirements
     @Operation(summary = "Show configured market-data providers", security = {})
-    public Map<String, Object> config() {
+    public ApiResponse<SystemConfigResponse> config() {
         boolean massive = !massiveKey.isBlank();
         boolean alpha = !alphaKey.isBlank();
-        return Map.of(
-                "massiveConfigured", massive,
-                "alphaVantageConfigured", alpha,
-                "realtimeProvider", massive ? "Massive" : alpha ? "Alpha Vantage" : "Demo fallback"
-        );
+        return ApiResponse.success(new SystemConfigResponse(massive, alpha,
+                massive ? "Massive" : alpha ? "Alpha Vantage" : "Not configured"));
     }
 }

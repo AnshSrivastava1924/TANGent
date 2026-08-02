@@ -417,24 +417,16 @@ INSERT INTO asset_classes (code, display_name, purpose, is_liability, is_liquid,
 INSERT INTO portfolio_assets
 (portfolio_id, asset_class_id, asset_name, provider_or_location, asset_identifier, quantity, unit_value, annual_income, note, valuation_date)
 VALUES
-(1, 1, 'Checking account', 'Community Bank', NULL, 1, 24500.00, 0.00, 'Monthly spending account', '2026-07-31'),
-(1, 1, 'Savings account', 'Community Bank', NULL, 1, 78000.00, 1800.00, 'Emergency reserve', '2026-07-31'),
-(1, 1, 'Fixed deposit ladder', 'National Bank', NULL, 1, 135000.00, 6400.00, 'Low-risk income', '2026-07-31'),
-(1, 2, 'Dividend stock basket', 'Brokerage', 'DIV-BASKET', 1, 162000.00, 6200.00, 'Blue-chip shares', '2026-07-31'),
-(1, 2, 'Broad market ETF', 'Brokerage', 'SPY', 420, 280.95, 2100.00, 'Diversified equity exposure', '2026-07-31'),
-(1, 3, 'Government bonds', 'Treasury Direct', 'GOV-BOND', 1, 220000.00, 10500.00, 'Core retirement income', '2026-07-31'),
-(1, 3, 'Municipal bond fund', 'Brokerage', 'MUNI-FUND', 1, 94000.00, 3900.00, 'Tax-aware income', '2026-07-31'),
-(1, 4, 'Balanced mutual fund', 'Brokerage', 'BAL-FUND', 1, 86000.00, 2600.00, 'Moderate risk', '2026-07-31'),
-(1, 4, 'Healthcare ETF', 'Brokerage', 'XLV', 300, 140.00, 700.00, 'Sector allocation', '2026-07-31'),
-(1, 5, 'Company pension', 'Former employer', NULL, 1, 0.00, 42000.00, 'Annual pension income', '2026-07-31'),
-(1, 5, 'Social security', 'Government', NULL, 1, 0.00, 31800.00, 'Annual benefit estimate', '2026-07-31'),
-(1, 6, 'Lifetime annuity', 'Secure Life', NULL, 1, 175000.00, 15600.00, 'Guaranteed yearly payout', '2026-07-31'),
-(1, 7, 'Primary home', 'Springfield', NULL, 1, 485000.00, 0.00, 'Mortgage-free residence', '2026-07-31'),
-(1, 7, 'Rental apartment', 'Lakeside', NULL, 1, 265000.00, 18000.00, 'Rental income property', '2026-07-31'),
-(1, 8, 'Gold holdings', 'Home safe and vault', NULL, 1, 36000.00, 0.00, 'Long-term reserve', '2026-07-31'),
-(1, 9, 'Whole life cash value', 'Secure Life', NULL, 1, 58000.00, 0.00, 'Policy cash value', '2026-07-31'),
-(1, 10, 'Home equity line', 'Community Bank', NULL, 1, 41000.00, 0.00, 'Outstanding balance', '2026-07-31'),
-(1, 10, 'Car loan', 'Auto Finance', NULL, 1, 12500.00, 0.00, 'Remaining balance', '2026-07-31');
+(1, 1, 'Checking, savings & fixed deposits', 'Community and National Banks', NULL, 1, 237500.00, 8200.00, 'Daily banking, emergency savings and FD ladder', '2026-08-02'),
+(1, 2, 'Dividend stocks & equity ETFs', 'Retirement Brokerage', 'EQUITY-MIX', 1, 280000.00, 8300.00, 'Dividend income and diversified listed equity', '2026-08-02'),
+(1, 3, 'Government & municipal bonds', 'Treasury and Brokerage', 'BOND-LADDER', 1, 314000.00, 14400.00, 'Predictable fixed-income allocation', '2026-08-02'),
+(1, 4, 'Balanced & healthcare mutual funds', 'Retirement Brokerage', 'FUND-MIX', 1, 128000.00, 3300.00, 'Balanced growth and healthcare exposure', '2026-08-02'),
+(1, 5, 'Company & government pension', 'Employer and Government', NULL, 1, 0.00, 73800.00, 'Combined annual pension and social-security income', '2026-08-02'),
+(1, 6, 'Lifetime retirement annuity', 'Secure Life', NULL, 1, 175000.00, 15600.00, 'Guaranteed annual retirement payout', '2026-08-02'),
+(1, 7, 'Primary home & rental property', 'Springfield and Lakeside', NULL, 1, 750000.00, 18000.00, 'Housing value including annual rental income', '2026-08-02'),
+(1, 8, 'Gold & commodities reserve', 'Home Safe and Vault', NULL, 1, 36000.00, 0.00, 'Inflation hedge and emergency reserve', '2026-08-02'),
+(1, 9, 'Whole-life insurance cash value', 'Secure Life', NULL, 1, 58000.00, 0.00, 'Accessible policy cash value', '2026-08-02'),
+(1, 10, 'Mortgage & vehicle loans', 'Community Bank and Auto Finance', NULL, 1, 53500.00, 0.00, 'Outstanding household debt', '2026-08-02');
 
 INSERT INTO instruments (symbol, instrument_name, exchange_code, asset_type, currency, is_major) VALUES
 ('AAPL', 'Apple Inc.', 'NASDAQ', 'stock', 'USD', TRUE),

@@ -160,7 +160,7 @@
         <div class="chart-panel">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Normalized performance</p>
+              <p class="eyebrow" id="compareProvider">Live provider comparison</p>
               <h3>Stock comparison</h3>
             </div>
           </div>
@@ -276,12 +276,15 @@
             <p class="eyebrow">Watchlist</p>
             <h2>Your saved stocks.</h2>
           </div>
-          <form id="watchlistForm" class="compare-form">
-            <label>Add symbol
-              <input id="watchlistInput" placeholder="TSLA" aria-label="Watchlist symbol">
-            </label>
-            <button class="primary-action" type="submit">Add</button>
-          </form>
+          <div class="watchlist-actions">
+            <form id="watchlistForm" class="compare-form">
+              <label>Add ticker symbol
+                <input id="watchlistInput" placeholder="TSLA" aria-label="Watchlist ticker symbol" autocomplete="off">
+              </label>
+              <button class="primary-action" type="submit">Add</button>
+            </form>
+            <p class="form-note watchlist-status" id="watchlistStatus" role="status" aria-live="polite">Enter a ticker such as IBM or TSLA.</p>
+          </div>
         </div>
         <div class="stock-grid" id="watchlistGrid"></div>
         <div class="chart-panel">

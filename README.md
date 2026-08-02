@@ -71,6 +71,31 @@ training123
 
 The application itself is available at <http://localhost:8080/>.
 
+## Backend architecture
+
+The backend is a traditional layered monolith. It deploys as one Spring Boot
+application connected to one MySQL database:
+
+```text
+src/main/java/com/tangent
+├── TangentApplication.java
+├── config
+├── constant
+├── controller
+├── dto
+├── exception
+├── repository
+├── security
+├── service
+└── wrapper
+```
+
+Controllers expose HTTP endpoints and validation, DTOs define API contracts,
+services contain business rules and transaction boundaries, repositories own
+SQL/database access, constants hold shared immutable values, and wrappers define
+the common API envelope. Successful JSON endpoints use `ApiResponse<T>`; failures
+use the matching typed error response from the global exception handler.
+
 ## Market provider keys
 
 Set one or both keys before starting the application:
@@ -81,4 +106,10 @@ export ALPHA_VANTAGE_API_KEY="your-key"
 ```
 
 Massive is preferred for quotes, aggregates, and news. Alpha Vantage is used as a
-fallback and for symbol search.
+fallback. The backend never invents stock prices: if configured providers reject
+a key, exceed a rate limit, or lack endpoint entitlement, the API returns `503`
+with the provider reason. Responses include `provider` and `freshness` fields.
+
+Live exchange data depends on the provider subscription. To request a paid Alpha
+Vantage entitlement, set `ALPHA_VANTAGE_ENTITLEMENT=realtime` (or `delayed`).
+Without it, Alpha Vantage documents its quote response as end-of-day data.

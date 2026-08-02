@@ -177,15 +177,43 @@ function bindShell() {
 
   document.getElementById("watchlistForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     const input = document.getElementById("watchlistInput");
+    const status = document.getElementById("watchlistStatus");
+    const button = form.querySelector('button[type="submit"]');
     const symbol = cleanSymbol(input.value, "");
-    if (symbol && !state.watchlist.includes(symbol)) {
+
+    if (!symbol) {
+      status.textContent = "Enter a valid ticker symbol.";
+      input.focus();
+      return;
+    }
+    if (state.watchlist.includes(symbol)) {
+      status.textContent = `${symbol} is already in your watchlist.`;
+      input.select();
+      return;
+    }
+
+    button.disabled = true;
+    status.textContent = `Saving ${symbol}...`;
+    try {
       await apiJson("/api/app/watchlist", { method: "POST", body: { symbol } });
       state.watchlist.push(symbol);
       state.watchSymbol = symbol;
       input.value = "";
-      await renderWatchlist();
-      await loadWatchlistChart(symbol);
+      status.textContent = `${symbol} saved. Loading market data...`;
+
+      const [, chart] = await Promise.allSettled([
+        renderWatchlist(),
+        loadWatchlistChart(symbol)
+      ]);
+      status.textContent = chart.status === "fulfilled"
+        ? `${symbol} was added to your watchlist.`
+        : `${symbol} was saved; its chart is temporarily unavailable.`;
+    } catch (error) {
+      status.textContent = `Could not add ${symbol}: ${error.message}`;
+    } finally {
+      button.disabled = false;
     }
   });
 
@@ -340,7 +368,7 @@ async function loadOverviewStock(symbol) {
     getJson(`/api/market/history/${encodeURIComponent(state.symbol)}?range=${state.range}`)
   ]);
   renderQuoteMetrics(quote);
-  document.getElementById("chartProvider").textContent = `${history.provider} price history`;
+  document.getElementById("chartProvider").textContent = marketSource(history, "price history");
   renderLineChart("priceChart", history.bars || [], [
     { label: "Close", key: "close", color: "#007aff", fill: true },
     { label: "High", key: "high", color: "#30d158" },
@@ -386,7 +414,18 @@ async function loadNews() {
 
 async function loadComparison() {
   const symbols = document.getElementById("compareInput").value.replace(/\s+/g, "").toUpperCase() || "AAPL,MSFT,NVDA";
-  const data = await getJson(`/api/market/compare?symbols=${encodeURIComponent(symbols)}&range=${state.range}`);
+  const providerLabel = document.getElementById("compareProvider");
+  providerLabel.textContent = "Loading live market data...";
+  let data;
+  try {
+    data = await getJson(`/api/market/compare?symbols=${encodeURIComponent(symbols)}&range=${state.range}`);
+  } catch (error) {
+    providerLabel.textContent = `Market data unavailable · ${error.message}`;
+    renderLineChart("compareChart", [], [], "Return %");
+    return;
+  }
+  const sources = [...new Set((data.series || []).map((item) => `${item.provider} ${formatFreshness(item.freshness)}`))];
+  providerLabel.textContent = sources.join(" · ") || "Market comparison";
   const colors = ["#007aff", "#30d158", "#ff9500", "#ff3b30", "#64d2ff"];
   const datasets = (data.series || []).map((item, index) => {
     const first = item.bars?.[0]?.close || 1;
@@ -513,14 +552,36 @@ function renderAssetClassDetails(totals) {
 async function renderWatchlist() {
   const grid = document.getElementById("watchlistGrid");
   grid.innerHTML = "";
-  const quotes = await quoteMany(state.watchlist);
-  quotes.forEach((quote) => grid.appendChild(stockCard(quote, () => loadWatchlistChart(quote.symbol))));
+  const requests = state.watchlist.map((symbol) => {
+    const card = savedStockCard(symbol);
+    grid.appendChild(card);
+    return getJson(`/api/market/quote/${encodeURIComponent(symbol)}`)
+      .then((quote) => card.replaceWith(stockCard(quote, () => loadWatchlistChart(quote.symbol))))
+      .catch(() => {
+        card.querySelector("span").textContent = "Saved · quote unavailable";
+        card.querySelector("small").textContent = "Click to retry the chart";
+      });
+  });
+  await Promise.allSettled(requests);
+}
+
+function savedStockCard(symbol) {
+  const card = document.createElement("button");
+  card.className = "stock-card";
+  card.type = "button";
+  card.innerHTML = `
+    <span>Saved · loading quote</span>
+    <strong>${escapeHtml(symbol)}</strong>
+    <small>Loading market data...</small>
+  `;
+  card.addEventListener("click", () => loadWatchlistChart(symbol));
+  return card;
 }
 
 async function loadWatchlistChart(symbol) {
   state.watchSymbol = cleanSymbol(symbol, state.watchlist[0] || "AAPL");
   const history = await getJson(`/api/market/history/${encodeURIComponent(state.watchSymbol)}?range=${state.range}`);
-  document.getElementById("watchChartProvider").textContent = `${history.provider} price history`;
+  document.getElementById("watchChartProvider").textContent = marketSource(history, "price history");
   document.getElementById("watchChartTitle").textContent = `${state.watchSymbol} trend`;
   renderLineChart("watchChart", history.bars || [], [
     { label: "Close", key: "close", color: "#007aff", fill: true },
@@ -542,7 +603,7 @@ function stockCard(quote, onSelect) {
   card.className = "stock-card";
   card.type = "button";
   card.innerHTML = `
-    <span>${escapeHtml(quote.provider || "Market")}</span>
+    <span>${escapeHtml(marketSource(quote, "quote"))}</span>
     <strong>${escapeHtml(quote.symbol)} · ${money.format(finiteNumber(quote.price))}</strong>
     <small class="${change >= 0 ? "positive" : "negative"}">${change >= 0 ? "+" : ""}${change.toFixed(2)}%</small>
   `;
@@ -734,23 +795,38 @@ async function apiJson(url, options = {}) {
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined
   });
+  const responseText = await response.text();
   if (!response.ok) {
     let message = `Request failed: ${response.status}`;
-    try {
-      const error = await response.json();
-      message = error.message || error.error || message;
-    } catch (_) {
-      const text = await response.text();
-      if (text) message = text;
+    if (responseText) {
+      try {
+        const error = JSON.parse(responseText);
+        message = error.message || error.error || message;
+      } catch (_) {
+        message = responseText;
+      }
     }
     throw new Error(message);
   }
-  if (response.status === 204) return null;
-  return response.json();
+  if (!responseText.trim()) return null;
+  const payload = JSON.parse(responseText);
+  return payload && payload.success === true && Object.prototype.hasOwnProperty.call(payload, "data")
+    ? payload.data
+    : payload;
 }
 
 function cleanSymbol(value, fallback) {
   return String(value || fallback).trim().toUpperCase().replace(/[^A-Z0-9.-]/g, "") || fallback;
+}
+
+function formatFreshness(value) {
+  return String(value || "").toLowerCase().replaceAll("_", " ");
+}
+
+function marketSource(data, suffix) {
+  const provider = data?.provider || "Market";
+  const freshness = formatFreshness(data?.freshness);
+  return `${provider}${freshness ? ` · ${freshness}` : ""} ${suffix}`;
 }
 
 function finiteNumber(value) {

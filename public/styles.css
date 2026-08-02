@@ -63,6 +63,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .hidden {
   display: none !important;
 }
@@ -452,6 +457,17 @@ canvas {
   justify-content: flex-end;
 }
 
+.watchlist-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.watchlist-status {
+  min-height: 18px;
+  text-align: right;
+}
+
 .compare-form label {
   min-width: min(100%, 360px);
 }
@@ -678,6 +694,14 @@ th {
   .compare-form {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .watchlist-actions {
+    justify-items: stretch;
+  }
+
+  .watchlist-status {
+    text-align: left;
   }
 
   .module-grid,
