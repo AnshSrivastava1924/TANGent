@@ -6,106 +6,8 @@ const state = {
   range: "3mo",
   majorStocks: ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "JPM"],
   watchlist: ["AAPL", "MSFT", "NVDA"],
-  portfolioClasses: [
-    {
-      id: "cash",
-      name: "Cash and Bank Accounts",
-      purpose: "Ready money for bills, emergencies, and near-term care needs.",
-      items: [
-        { name: "Checking account", value: 24500, income: 0, note: "Monthly spending account" },
-        { name: "Savings account", value: 78000, income: 1800, note: "Emergency reserve" },
-        { name: "Fixed deposit ladder", value: 135000, income: 6400, note: "Low-risk income" }
-      ]
-    },
-    {
-      id: "securities",
-      name: "Listed Securities",
-      purpose: "Stocks and ETFs that provide growth and dividend potential.",
-      items: [
-        { name: "Dividend stock basket", value: 162000, income: 6200, note: "Blue-chip shares" },
-        { name: "Broad market ETF", value: 118000, income: 2100, note: "Diversified equity exposure" }
-      ]
-    },
-    {
-      id: "fixedIncome",
-      name: "Bonds and Fixed Income",
-      purpose: "Stability, predictable coupons, and lower volatility.",
-      items: [
-        { name: "Government bonds", value: 220000, income: 10500, note: "Core retirement income" },
-        { name: "Municipal bond fund", value: 94000, income: 3900, note: "Tax-aware income" }
-      ]
-    },
-    {
-      id: "funds",
-      name: "Mutual Funds and ETFs",
-      purpose: "Managed diversification across markets and sectors.",
-      items: [
-        { name: "Balanced mutual fund", value: 86000, income: 2600, note: "Moderate risk" },
-        { name: "Healthcare ETF", value: 42000, income: 700, note: "Sector allocation" }
-      ]
-    },
-    {
-      id: "pension",
-      name: "Pension Sources",
-      purpose: "Expected yearly income from retirement plans.",
-      items: [
-        { name: "Company pension", value: 0, income: 42000, note: "Annual pension income" },
-        { name: "Social security", value: 0, income: 31800, note: "Annual benefit estimate" }
-      ]
-    },
-    {
-      id: "annuities",
-      name: "Annuities",
-      purpose: "Contracted income that can support regular expenses.",
-      items: [
-        { name: "Lifetime annuity", value: 175000, income: 15600, note: "Guaranteed yearly payout" }
-      ]
-    },
-    {
-      id: "housing",
-      name: "Housing and Real Estate",
-      purpose: "Home equity and rental property value.",
-      items: [
-        { name: "Primary home", value: 485000, income: 0, note: "Mortgage-free residence" },
-        { name: "Rental apartment", value: 265000, income: 18000, note: "Rental income property" }
-      ]
-    },
-    {
-      id: "commodities",
-      name: "Gold and Commodities",
-      purpose: "Inflation hedge and alternative asset exposure.",
-      items: [
-        { name: "Gold holdings", value: 36000, income: 0, note: "Long-term reserve" }
-      ]
-    },
-    {
-      id: "insurance",
-      name: "Insurance Cash Value",
-      purpose: "Policies with accessible value or estate-planning support.",
-      items: [
-        { name: "Whole life cash value", value: 58000, income: 0, note: "Policy cash value" }
-      ]
-    },
-    {
-      id: "liabilities",
-      name: "Loans and Debts",
-      purpose: "Amounts owed that reduce household net worth.",
-      isLiability: true,
-      items: [
-        { name: "Home equity line", value: 41000, income: 0, note: "Outstanding balance" },
-        { name: "Car loan", value: 12500, income: 0, note: "Remaining balance" }
-      ]
-    }
-  ],
-  expenses: [
-    { date: "2026-07-31", name: "Groceries", category: "Food", amount: 84 },
-    { date: "2026-07-31", name: "Prescription refill", category: "Health", amount: 42 },
-    { date: "2026-07-30", name: "Electric bill", category: "Utilities", amount: 126 },
-    { date: "2026-07-30", name: "Taxi to clinic", category: "Transport", amount: 28 },
-    { date: "2026-07-29", name: "Dinner with family", category: "Family", amount: 96 },
-    { date: "2026-07-28", name: "Gardening supplies", category: "Housing", amount: 64 },
-    { date: "2026-07-27", name: "Movie tickets", category: "Leisure", amount: 34 }
-  ],
+  portfolioClasses: [],
+  expenses: [],
   charts: {}
 };
 
@@ -185,6 +87,7 @@ function bindShell() {
 
   bindTickerSearch("symbolInput", "symbolSuggestions");
   bindTickerSearch("watchlistInput", "watchlistSuggestions");
+  document.getElementById("expenseDate").value = todayIso();
 
   document.getElementById("symbolForm").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -246,19 +149,71 @@ function bindShell() {
 
   document.getElementById("expenseForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    const status = document.getElementById("expenseFormStatus");
     const name = document.getElementById("expenseName").value.trim() || "Expense";
     const category = document.getElementById("expenseCategory").value;
     const amount = finiteNumber(document.getElementById("expenseAmount").value);
-    if (amount <= 0) return;
-    const expense = await apiJson("/api/app/expenses", {
-      method: "POST",
-      body: { date: todayIso(), name, category, amount }
-    });
-    state.expenses.unshift(expense);
-    document.getElementById("expenseName").value = "";
-    document.getElementById("expenseAmount").value = "50";
-    renderBuddy();
-    showToast("Expense added", "success");
+    const date = document.getElementById("expenseDate").value;
+    if (amount <= 0 || !date) {
+      status.textContent = "Enter a positive amount and a valid date.";
+      return;
+    }
+    button.disabled = true;
+    status.textContent = "Saving expense...";
+    try {
+      const expense = await apiJson("/api/app/expenses", {
+        method: "POST",
+        body: { date, name, category, amount }
+      });
+      state.expenses.unshift(expense);
+      document.getElementById("expenseName").value = "";
+      document.getElementById("expenseAmount").value = "";
+      renderBuddy();
+      status.textContent = "Expense saved and charts updated.";
+      showToast("Expense added", "success");
+    } catch (error) {
+      status.textContent = error.message;
+      showToast("Could not add expense", "error");
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  document.getElementById("assetForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    const status = document.getElementById("assetFormStatus");
+    const assetClassId = Number(document.getElementById("assetClass").value);
+    const assetName = document.getElementById("assetName").value.trim();
+    const amount = finiteNumber(document.getElementById("assetAmount").value);
+    const annualIncome = finiteNumber(document.getElementById("assetIncome").value);
+    if (!assetClassId || !assetName || amount <= 0 || annualIncome < 0) {
+      status.textContent = "Choose an asset class and enter a positive amount.";
+      return;
+    }
+    button.disabled = true;
+    status.textContent = "Saving allocation...";
+    try {
+      await apiJson("/api/app/assets", {
+        method: "POST",
+        body: { assetClassId, assetName, quantity: 1, unitValue: amount, annualIncome }
+      });
+      await loadAppData();
+      await renderPortfolio();
+      form.reset();
+      document.getElementById("assetIncome").value = "0";
+      syncAssetClassOptions();
+      status.textContent = "Allocation saved and charts updated.";
+      showToast("Retirement allocation added", "success");
+    } catch (error) {
+      status.textContent = error.message;
+      showToast("Could not add allocation", "error");
+    } finally {
+      button.disabled = false;
+    }
   });
 
   document.addEventListener("click", (event) => {
@@ -290,6 +245,17 @@ async function loadAppData() {
   state.expenses = data.expenses || [];
   state.watchlist = data.watchlist?.length ? data.watchlist : [];
   state.watchSymbol = state.watchlist[0] || "AAPL";
+  syncAssetClassOptions();
+}
+
+function syncAssetClassOptions() {
+  const select = document.getElementById("assetClass");
+  if (!select) return;
+  const selected = select.value;
+  select.innerHTML = state.portfolioClasses
+    .map((assetClass) => `<option value="${assetClass.classId}">${escapeHtml(assetClass.name)}</option>`)
+    .join("");
+  if ([...select.options].some((option) => option.value === selected)) select.value = selected;
 }
 
 async function loadConfig() {
@@ -405,19 +371,21 @@ async function renderHomeWatchlist() {
 
 function renderBuddy() {
   const today = todayIso();
+  const currentMonth = today.slice(0, 7);
   const todaySpend = state.expenses
     .filter((expense) => expense.date === today)
     .reduce((sum, expense) => sum + finiteNumber(expense.amount), 0);
-  const monthSpend = state.expenses.reduce((sum, expense) => sum + finiteNumber(expense.amount), 0);
-  const categoryTotals = totalsByCategory(state.expenses);
+  const monthExpenses = state.expenses.filter((expense) => expense.date.startsWith(currentMonth));
+  const monthSpend = monthExpenses.reduce((sum, expense) => sum + finiteNumber(expense.amount), 0);
+  const categoryTotals = totalsByCategory(monthExpenses);
   const largestCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0] || ["None", 0];
-  const avgDaily = monthSpend / Math.max(new Set(state.expenses.map((expense) => expense.date)).size, 1);
+  const avgDaily = monthSpend / Math.max(new Set(monthExpenses.map((expense) => expense.date)).size, 1);
 
   const grid = document.getElementById("buddySummaryGrid");
   grid.innerHTML = "";
   [
     ["Today", todaySpend, "Spending recorded today"],
-    ["This month", monthSpend, "Mock July spending total"],
+    ["This month", monthSpend, "Recorded spending this month"],
     ["Largest category", largestCategory[1], largestCategory[0]],
     ["Daily average", avgDaily, "Average across active days"]
   ].forEach(([label, value, note]) => {
@@ -428,7 +396,7 @@ function renderBuddy() {
   });
 
   renderPieChart("expenseCategoryChart", Object.keys(categoryTotals), Object.values(categoryTotals));
-  const dailyTotals = totalsByDate(state.expenses);
+  const dailyTotals = totalsByDate(monthExpenses);
   renderBarChart("expenseTrendChart", Object.keys(dailyTotals), Object.values(dailyTotals), "Daily spend");
   renderExpenseHistory();
 }
@@ -451,16 +419,28 @@ function renderExpenseHistory() {
         <strong>${escapeHtml(expense.name)}</strong>
         <small>${escapeHtml(expense.date)} · ${escapeHtml(expense.category)}</small>
       </div>
-      <input type="number" min="0" step="1" value="${finiteNumber(expense.amount)}" data-expense-index="${index}">
+      <input type="number" min="0.01" step="0.01" value="${finiteNumber(expense.amount)}" data-expense-index="${index}">
     `;
     history.appendChild(row);
   });
   history.querySelectorAll("input").forEach((input) => {
     input.addEventListener("change", async (event) => {
       const expense = state.expenses[Number(event.target.dataset.expenseIndex)];
-      expense.amount = finiteNumber(event.target.value);
-      await apiJson(`/api/app/expenses/${expense.id}`, { method: "PUT", body: { amount: expense.amount } });
-      renderBuddy();
+      const previousAmount = expense.amount;
+      const amount = finiteNumber(event.target.value);
+      if (amount <= 0) {
+        event.target.value = finiteNumber(previousAmount);
+        showToast("Expense amount must be greater than zero", "error");
+        return;
+      }
+      try {
+        await apiJson(`/api/app/expenses/${expense.id}`, { method: "PUT", body: { amount } });
+        expense.amount = amount;
+        renderBuddy();
+      } catch (error) {
+        event.target.value = finiteNumber(previousAmount);
+        showToast(error.message, "error");
+      }
     });
   });
 }
@@ -680,13 +660,26 @@ function renderAssetClassDetails(totals) {
       const itemIndex = Number(event.target.dataset.itemIndex);
       const field = event.target.dataset.field;
       const assetClass = state.portfolioClasses.find((item) => item.id === classId);
-      assetClass.items[itemIndex][field] = finiteNumber(event.target.value);
       const item = assetClass.items[itemIndex];
-      await apiJson(`/api/app/assets/${item.id}`, {
-        method: "PUT",
-        body: { value: finiteNumber(item.value), income: finiteNumber(item.income) }
-      });
-      renderPortfolio();
+      const previousValue = item[field];
+      const nextValue = finiteNumber(event.target.value);
+      if (nextValue < 0) {
+        event.target.value = finiteNumber(previousValue);
+        showToast("Portfolio values cannot be negative", "error");
+        return;
+      }
+      try {
+        const update = {
+          value: field === "value" ? nextValue : finiteNumber(item.value),
+          income: field === "income" ? nextValue : finiteNumber(item.income)
+        };
+        await apiJson(`/api/app/assets/${item.id}`, { method: "PUT", body: update });
+        item[field] = nextValue;
+        renderPortfolio();
+      } catch (error) {
+        event.target.value = finiteNumber(previousValue);
+        showToast(error.message, "error");
+      }
     });
   });
 }
@@ -847,6 +840,12 @@ function drawEmptyChart(canvas, message) {
 function renderPieChart(canvasId, labels, values) {
   const canvas = document.getElementById(canvasId);
   const colors = ["#007aff", "#30d158", "#ff9500", "#ff3b30", "#64d2ff", "#5856d6", "#8e8e93", "#af52de", "#34c759"];
+  if (!labels.length || values.every((value) => finiteNumber(value) === 0)) {
+    if (state.charts[canvasId]) state.charts[canvasId].destroy();
+    delete state.charts[canvasId];
+    drawEmptyChart(canvas, "No data recorded yet");
+    return;
+  }
   if (typeof Chart === "undefined") {
     drawFallbackPie(canvas, labels, values, colors);
     return;
@@ -869,6 +868,12 @@ function renderPieChart(canvasId, labels, values) {
 
 function renderBarChart(canvasId, labels, values, yTitle) {
   const canvas = document.getElementById(canvasId);
+  if (!labels.length) {
+    if (state.charts[canvasId]) state.charts[canvasId].destroy();
+    delete state.charts[canvasId];
+    drawEmptyChart(canvas, "No data recorded yet");
+    return;
+  }
   if (typeof Chart === "undefined") {
     drawFallbackBars(canvas, labels, values, yTitle);
     return;

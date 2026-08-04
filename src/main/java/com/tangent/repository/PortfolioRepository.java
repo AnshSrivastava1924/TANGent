@@ -26,29 +26,6 @@ import static com.tangent.constant.ApplicationConstants.EXPENSE_CATEGORIES;
 @Repository
 public class PortfolioRepository {
 
-    private static final List<StarterAsset> STARTER_ASSETS = List.of(
-            new StarterAsset(10, "Checking, savings & fixed deposits", "Community and National Banks", null,
-                    "237500", "8200", "Daily banking, emergency savings and FD ladder"),
-            new StarterAsset(20, "Dividend stocks & equity ETFs", "Retirement Brokerage", "EQUITY-MIX",
-                    "280000", "8300", "Dividend income and diversified listed equity"),
-            new StarterAsset(30, "Government & municipal bonds", "Treasury and Brokerage", "BOND-LADDER",
-                    "314000", "14400", "Predictable fixed-income allocation"),
-            new StarterAsset(40, "Balanced & healthcare mutual funds", "Retirement Brokerage", "FUND-MIX",
-                    "128000", "3300", "Balanced growth and healthcare exposure"),
-            new StarterAsset(50, "Company & government pension", "Employer and Government", null,
-                    "0", "73800", "Combined annual pension and social-security income"),
-            new StarterAsset(60, "Lifetime retirement annuity", "Secure Life", null,
-                    "175000", "15600", "Guaranteed annual retirement payout"),
-            new StarterAsset(70, "Primary home & rental property", "Springfield and Lakeside", null,
-                    "750000", "18000", "Housing value including annual rental income"),
-            new StarterAsset(80, "Gold & commodities reserve", "Home Safe and Vault", null,
-                    "36000", "0", "Inflation hedge and emergency reserve"),
-            new StarterAsset(90, "Whole-life insurance cash value", "Secure Life", null,
-                    "58000", "0", "Accessible policy cash value"),
-            new StarterAsset(100, "Mortgage & vehicle loans", "Community Bank and Auto Finance", null,
-                    "53500", "0", "Outstanding household debt")
-    );
-
     private final JdbcTemplate jdbc;
 
     public PortfolioRepository(JdbcTemplate jdbc) {
@@ -77,14 +54,14 @@ public class PortfolioRepository {
                 rs -> rs.next() ? rs.getLong(1) : null, userId);
         if (portfolioId != null) {
             jdbc.query("""
-                    SELECT asset_id, asset_class_id, asset_name, current_value, annual_income, note
+                    SELECT asset_id, asset_class_id, asset_name, current_value, annual_income
                     FROM portfolio_assets WHERE portfolio_id = ? ORDER BY asset_id
                     """, rs -> {
                 MutableClass assetClass = classes.get(rs.getLong("asset_class_id"));
                 if (assetClass != null) {
                     assetClass.items.add(new PortfolioAssetResponse(rs.getLong("asset_id"),
                             rs.getString("asset_name"), rs.getBigDecimal("current_value"),
-                            rs.getBigDecimal("annual_income"), nullableText(rs.getString("note"))));
+                            rs.getBigDecimal("annual_income"), ""));
                 }
             }, portfolioId);
         }
@@ -115,7 +92,7 @@ public class PortfolioRepository {
         return jdbc.update("""
                 UPDATE portfolio_assets pa
                 SET unit_value = ? / CASE WHEN quantity = 0 THEN 1 ELSE quantity END,
-                    annual_income = ?, valuation_date = CURRENT_DATE, updated_at = CURRENT_TIMESTAMP
+                    annual_income = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE pa.asset_id = ? AND EXISTS (
                     SELECT 1 FROM portfolios p WHERE p.portfolio_id = pa.portfolio_id AND p.user_id = ?)
                 """, value, income, assetId, userId);
@@ -216,7 +193,11 @@ public class PortfolioRepository {
                 """, userId, symbol.toUpperCase(Locale.ROOT));
     }
 
-    public void createStarterWorkspace(long userId) {
+    public long getOrCreatePortfolio(long userId) {
+        Long portfolioId = jdbc.query("SELECT portfolio_id FROM portfolios WHERE user_id = ? ORDER BY portfolio_id LIMIT 1",
+                rs -> rs.next() ? rs.getLong(1) : null, userId);
+        if (portfolioId != null) return portfolioId;
+
         GeneratedKeyHolder keys = new GeneratedKeyHolder();
         jdbc.update(connection -> {
             PreparedStatement statement = connection.prepareStatement(
@@ -224,34 +205,67 @@ public class PortfolioRepository {
                     new String[]{"portfolio_id"});
             statement.setLong(1, userId);
             statement.setString(2, "My Portfolio");
-            statement.setString(3, "Build long-term financial security");
+            statement.setString(3, "My retirement portfolio");
             return statement;
         }, keys);
         Number key = keys.getKey();
         if (key == null) throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to create portfolio");
-        long portfolioId = key.longValue();
+        return key.longValue();
+    }
 
-        for (StarterAsset asset : STARTER_ASSETS) {
+    public void createDefaultExpenseCategories(long userId) {
+        for (int index = 0; index < EXPENSE_CATEGORIES.size(); index++) {
+            String category = EXPENSE_CATEGORIES.get(index);
+            String color = List.of("#007AFF", "#30D158", "#FF9500", "#FF3B30",
+                    "#64D2FF", "#5856D6", "#8E8E93").get(index);
             jdbc.update("""
-                    INSERT INTO portfolio_assets
-                        (portfolio_id, asset_class_id, asset_name, provider_or_location,
-                         asset_identifier, quantity, unit_value, annual_income, note, valuation_date)
-                    SELECT ?, asset_class_id, ?, ?, ?, 1, ?, ?, ?, CURRENT_DATE
-                    FROM asset_classes WHERE sort_order = ?
-                    """, portfolioId, asset.name(), asset.provider(), asset.identifier(), asset.value(),
-                    asset.income(), asset.note(), asset.classSortOrder());
-        }
-        createWatchlist(userId);
-        for (String category : EXPENSE_CATEGORIES) {
-            jdbc.update("""
-                    INSERT INTO buddy_categories (user_id, category_name, monthly_budget, color_hex)
-                    VALUES (?, ?, 0, '#007AFF')
-                    """, userId, category);
+                    INSERT INTO buddy_categories
+                        (user_id, category_name, monthly_budget, color_hex, created_at)
+                    VALUES (?, ?, 0, ?, CURRENT_TIMESTAMP)
+                    """, userId, category, color);
         }
     }
 
-    private String nullableText(String value) {
-        return value == null ? "" : value;
+    public boolean assetClassExists(long assetClassId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM asset_classes WHERE asset_class_id = ?",
+                Integer.class, assetClassId);
+        return count != null && count > 0;
+    }
+
+    public long createAsset(long portfolioId, long assetClassId, String assetName,
+                           BigDecimal quantity, BigDecimal unitValue, BigDecimal annualIncome) {
+        GeneratedKeyHolder keys = new GeneratedKeyHolder();
+        jdbc.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO portfolio_assets
+                        (portfolio_id, asset_class_id, asset_name, quantity, unit_value, annual_income, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """, new String[]{"asset_id"});
+            statement.setLong(1, portfolioId);
+            statement.setLong(2, assetClassId);
+            statement.setString(3, assetName);
+            statement.setBigDecimal(4, quantity);
+            statement.setBigDecimal(5, unitValue);
+            statement.setBigDecimal(6, annualIncome);
+            return statement;
+        }, keys);
+        Number key = keys.getKey();
+        if (key == null) throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to create asset");
+        return key.longValue();
+    }
+
+    public int deleteAsset(long userId, long assetId) {
+        return jdbc.update("""
+                DELETE FROM portfolio_assets
+                WHERE asset_id = ? AND EXISTS (
+                    SELECT 1 FROM portfolios p WHERE p.portfolio_id = portfolio_assets.portfolio_id AND p.user_id = ?)
+                """, assetId, userId);
+    }
+
+    public String getAssetClassName(long assetClassId) {
+        return jdbc.query("SELECT display_name FROM asset_classes WHERE asset_class_id = ?",
+                rs -> rs.next() ? rs.getString(1) : null, assetClassId);
     }
 
     private static final class MutableClass {
@@ -278,12 +292,4 @@ public class PortfolioRepository {
         }
     }
 
-    private record StarterAsset(int classSortOrder, String name, String provider, String identifier,
-                                BigDecimal value, BigDecimal income, String note) {
-        private StarterAsset(int classSortOrder, String name, String provider, String identifier,
-                             String value, String income, String note) {
-            this(classSortOrder, name, provider, identifier,
-                    new BigDecimal(value), new BigDecimal(income), note);
-        }
-    }
 }

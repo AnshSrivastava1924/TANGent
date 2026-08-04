@@ -1,5 +1,7 @@
 package com.tangent.service;
 
+import com.tangent.dto.AssetCreateRequest;
+import com.tangent.dto.AssetCreateResponse;
 import com.tangent.dto.ExpenseCreateRequest;
 import com.tangent.dto.ExpenseResponse;
 import com.tangent.dto.PortfolioBootstrapResponse;
@@ -34,6 +36,27 @@ public class PortfolioService {
     @Transactional
     public void updateAsset(long userId, long assetId, BigDecimal value, BigDecimal income) {
         if (repository.updateAsset(userId, assetId, value, income) == 0) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "Asset not found");
+        }
+    }
+
+    @Transactional
+    public AssetCreateResponse createAsset(long userId, AssetCreateRequest request) {
+        if (!repository.assetClassExists(request.assetClassId())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Unknown asset class");
+        }
+        long portfolioId = repository.getOrCreatePortfolio(userId);
+        long assetId = repository.createAsset(portfolioId, request.assetClassId(), request.assetName(),
+                request.quantity(), request.unitValue(), request.annualIncome());
+        String className = repository.getAssetClassName(request.assetClassId());
+        BigDecimal currentValue = request.quantity().multiply(request.unitValue());
+        return new AssetCreateResponse(assetId, request.assetName(), className, request.quantity(),
+                request.unitValue(), currentValue, request.annualIncome());
+    }
+
+    @Transactional
+    public void deleteAsset(long userId, long assetId) {
+        if (repository.deleteAsset(userId, assetId) == 0) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Asset not found");
         }
     }

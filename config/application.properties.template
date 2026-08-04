@@ -1,0 +1,22 @@
+# TANGent Application Configuration Template
+# Copy this file to config/application.properties and update the values
+
+# Database Configuration
+spring.datasource.url=jdbc:mysql://127.0.0.1:3306/tangent_db?useSSL=false&serverTimezone=UTC
+spring.datasource.username=tangent_app
+spring.datasource.password=YOUR_PASSWORD_HERE
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+# JWT Configuration (minimum 32 characters)
+jwt.secret=replace-this-with-at-least-32-random-characters
+
+# Market Data API Keys (optional - uses demo data if not provided)
+market.massive.api-key=
+market.alpha-vantage.api-key=
+
+# Server Configuration
+server.port=8080
+
+# Logging
+logging.level.com.tangent=INFO
+

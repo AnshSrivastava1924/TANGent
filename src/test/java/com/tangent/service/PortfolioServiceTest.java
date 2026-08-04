@@ -1,5 +1,7 @@
 package com.tangent.service;
 
+import com.tangent.dto.AssetCreateRequest;
+import com.tangent.dto.AssetCreateResponse;
 import com.tangent.dto.ExpenseCreateRequest;
 import com.tangent.dto.ExpenseResponse;
 import com.tangent.dto.PortfolioBootstrapResponse;
@@ -90,6 +92,35 @@ class PortfolioServiceTest {
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("Asset not found")
                 .satisfies(exception -> assertThat(((ApiException) exception).status()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void should_createAsset_when_assetClassExists() {
+        AssetCreateRequest request = new AssetCreateRequest("Retirement cash", 3L,
+                BigDecimal.ONE, new BigDecimal("2500.50"), new BigDecimal("100"));
+        when(repository.assetClassExists(3L)).thenReturn(true);
+        when(repository.getOrCreatePortfolio(USER_ID)).thenReturn(8L);
+        when(repository.createAsset(8L, 3L, "Retirement cash", BigDecimal.ONE,
+                new BigDecimal("2500.50"), new BigDecimal("100"))).thenReturn(15L);
+        when(repository.getAssetClassName(3L)).thenReturn("Cash");
+
+        AssetCreateResponse response = portfolioService.createAsset(USER_ID, request);
+
+        assertThat(response.assetId()).isEqualTo(15L);
+        assertThat(response.currentValue()).isEqualByComparingTo("2500.50");
+    }
+
+    @Test
+    void should_rejectAsset_when_assetClassDoesNotExist() {
+        AssetCreateRequest request = new AssetCreateRequest("Unknown", 999L,
+                BigDecimal.ONE, BigDecimal.TEN, BigDecimal.ZERO);
+        when(repository.assetClassExists(999L)).thenReturn(false);
+
+        assertThatThrownBy(() -> portfolioService.createAsset(USER_ID, request))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("Unknown asset class");
+
+        verify(repository, never()).createAsset(anyLong(), anyLong(), anyString(), any(), any(), any());
     }
 
     @Test

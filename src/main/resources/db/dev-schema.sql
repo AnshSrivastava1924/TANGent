@@ -3,9 +3,6 @@ CREATE TABLE users (
   email VARCHAR(255) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   full_name VARCHAR(160) NOT NULL,
-  date_of_birth DATE,
-  risk_profile VARCHAR(32) NOT NULL DEFAULT 'moderate',
-  base_currency CHAR(3) NOT NULL DEFAULT 'USD',
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -14,12 +11,13 @@ CREATE TABLE users (
 CREATE TABLE portfolios (
   portfolio_id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
-  portfolio_name VARCHAR(160) NOT NULL,
+  portfolio_name VARCHAR(160) NOT NULL DEFAULT 'My Portfolio',
   goal_description VARCHAR(255),
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
+CREATE INDEX idx_portfolios_user ON portfolios(user_id);
 
 CREATE TABLE asset_classes (
   asset_class_id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -36,19 +34,21 @@ CREATE TABLE portfolio_assets (
   portfolio_id BIGINT NOT NULL,
   asset_class_id BIGINT NOT NULL,
   asset_name VARCHAR(160) NOT NULL,
-  provider_or_location VARCHAR(160),
-  asset_identifier VARCHAR(80),
+  symbol VARCHAR(30),
   quantity DECIMAL(18,4) NOT NULL DEFAULT 1,
   unit_value DECIMAL(18,2) NOT NULL DEFAULT 0,
   current_value DECIMAL(18,2) GENERATED ALWAYS AS (quantity * unit_value),
   annual_income DECIMAL(18,2) NOT NULL DEFAULT 0,
-  note VARCHAR(255),
-  valuation_date DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_asset_quantity CHECK (quantity > 0),
+  CONSTRAINT chk_asset_unit_value CHECK (unit_value >= 0),
+  CONSTRAINT chk_asset_income CHECK (annual_income >= 0),
   FOREIGN KEY (portfolio_id) REFERENCES portfolios(portfolio_id) ON DELETE CASCADE,
   FOREIGN KEY (asset_class_id) REFERENCES asset_classes(asset_class_id)
 );
+CREATE INDEX idx_assets_portfolio ON portfolio_assets(portfolio_id);
+CREATE INDEX idx_assets_class ON portfolio_assets(asset_class_id);
 
 CREATE TABLE instruments (
   instrument_id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -64,10 +64,11 @@ CREATE TABLE instruments (
 CREATE TABLE watchlists (
   watchlist_id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
-  watchlist_name VARCHAR(120) NOT NULL DEFAULT 'Default Watchlist',
+  watchlist_name VARCHAR(120) NOT NULL DEFAULT 'My Watchlist',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
+CREATE INDEX idx_watchlists_user ON watchlists(user_id);
 
 CREATE TABLE watchlist_items (
   watchlist_item_id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -75,7 +76,7 @@ CREATE TABLE watchlist_items (
   instrument_id BIGINT NOT NULL,
   added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (watchlist_id) REFERENCES watchlists(watchlist_id) ON DELETE CASCADE,
-  FOREIGN KEY (instrument_id) REFERENCES instruments(instrument_id),
+  FOREIGN KEY (instrument_id) REFERENCES instruments(instrument_id) ON DELETE CASCADE,
   UNIQUE (watchlist_id, instrument_id)
 );
 
@@ -87,7 +88,8 @@ CREATE TABLE buddy_categories (
   color_hex CHAR(7) NOT NULL DEFAULT '#007AFF',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-  UNIQUE (user_id, category_name)
+  UNIQUE (user_id, category_name),
+  UNIQUE (user_id, buddy_category_id)
 );
 
 CREATE TABLE buddy_expenses (
@@ -97,70 +99,47 @@ CREATE TABLE buddy_expenses (
   expense_name VARCHAR(160) NOT NULL,
   amount DECIMAL(12,2) NOT NULL,
   spent_on DATE NOT NULL,
-  notes VARCHAR(255),
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_expense_amount CHECK (amount > 0),
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-  FOREIGN KEY (buddy_category_id) REFERENCES buddy_categories(buddy_category_id)
+  FOREIGN KEY (user_id, buddy_category_id)
+    REFERENCES buddy_categories(user_id, buddy_category_id) ON DELETE CASCADE
 );
+CREATE INDEX idx_expenses_user_date ON buddy_expenses(user_id, spent_on);
 
-INSERT INTO users (email, password_hash, full_name, date_of_birth, risk_profile)
-VALUES ('student@tangent.local', '{seed}', 'Anita Sharma', '1956-04-18', 'conservative');
+INSERT INTO users (email, password_hash, full_name)
+VALUES ('student@tangent.local', '{seed}', 'Student User');
 
 INSERT INTO portfolios (user_id, portfolio_name, goal_description)
-VALUES (1, 'Retirement household portfolio', 'Balance income, safety, housing, and long-term family wealth');
+VALUES (1, 'My Portfolio', 'My retirement portfolio');
 
 INSERT INTO asset_classes (code, display_name, purpose, is_liability, is_liquid, sort_order) VALUES
-('cash', 'Cash and Bank Accounts', 'Ready money for bills, emergencies, and near-term care needs.', FALSE, TRUE, 10),
-('securities', 'Listed Securities', 'Stocks and ETFs that provide growth and dividend potential.', FALSE, TRUE, 20),
-('fixed_income', 'Bonds and Fixed Income', 'Stability, predictable coupons, and lower volatility.', FALSE, TRUE, 30),
-('funds', 'Mutual Funds and ETFs', 'Managed diversification across markets and sectors.', FALSE, TRUE, 40),
-('pension', 'Pension Sources', 'Expected yearly income from retirement plans.', FALSE, FALSE, 50),
-('annuities', 'Annuities', 'Contracted income that can support regular expenses.', FALSE, FALSE, 60),
-('housing', 'Housing and Real Estate', 'Home equity and rental property value.', FALSE, FALSE, 70),
-('commodities', 'Gold and Commodities', 'Inflation hedge and alternative asset exposure.', FALSE, FALSE, 80),
-('insurance', 'Insurance Cash Value', 'Policies with accessible value or estate-planning support.', FALSE, FALSE, 90),
-('liabilities', 'Loans and Debts', 'Amounts owed that reduce household net worth.', TRUE, FALSE, 100);
-
-INSERT INTO portfolio_assets
-(portfolio_id, asset_class_id, asset_name, provider_or_location, asset_identifier, quantity, unit_value, annual_income, note, valuation_date) VALUES
-(1,1,'Checking, savings & fixed deposits','Community and National Banks',NULL,1,237500,8200,'Daily banking, emergency savings and FD ladder','2026-08-02'),
-(1,2,'Dividend stocks & equity ETFs','Retirement Brokerage','EQUITY-MIX',1,280000,8300,'Dividend income and diversified listed equity','2026-08-02'),
-(1,3,'Government & municipal bonds','Treasury and Brokerage','BOND-LADDER',1,314000,14400,'Predictable fixed-income allocation','2026-08-02'),
-(1,4,'Balanced & healthcare mutual funds','Retirement Brokerage','FUND-MIX',1,128000,3300,'Balanced growth and healthcare exposure','2026-08-02'),
-(1,5,'Company & government pension','Employer and Government',NULL,1,0,73800,'Combined annual pension and social-security income','2026-08-02'),
-(1,6,'Lifetime retirement annuity','Secure Life',NULL,1,175000,15600,'Guaranteed annual retirement payout','2026-08-02'),
-(1,7,'Primary home & rental property','Springfield and Lakeside',NULL,1,750000,18000,'Housing value including annual rental income','2026-08-02'),
-(1,8,'Gold & commodities reserve','Home Safe and Vault',NULL,1,36000,0,'Inflation hedge and emergency reserve','2026-08-02'),
-(1,9,'Whole-life insurance cash value','Secure Life',NULL,1,58000,0,'Accessible policy cash value','2026-08-02'),
-(1,10,'Mortgage & vehicle loans','Community Bank and Auto Finance',NULL,1,53500,0,'Outstanding household debt','2026-08-02');
+('cash', 'Cash & Bank Accounts', 'Liquid money for daily needs and emergencies', FALSE, TRUE, 10),
+('stocks', 'Stocks & Equities', 'Individual company stocks and equity investments', FALSE, TRUE, 20),
+('bonds', 'Bonds & Fixed Income', 'Government and corporate bonds for stable income', FALSE, TRUE, 30),
+('funds', 'Mutual Funds & ETFs', 'Diversified investment funds', FALSE, TRUE, 40),
+('real_estate', 'Real Estate', 'Property and real estate investments', FALSE, FALSE, 50),
+('crypto', 'Cryptocurrency', 'Digital assets and crypto investments', FALSE, TRUE, 60),
+('commodities', 'Commodities', 'Gold, silver, and other commodities', FALSE, FALSE, 70),
+('other_assets', 'Other Assets', 'Miscellaneous investments', FALSE, FALSE, 80),
+('liabilities', 'Loans & Debts', 'Outstanding debts and liabilities', TRUE, FALSE, 90);
 
 INSERT INTO instruments (symbol, instrument_name, exchange_code, asset_type, currency, is_major) VALUES
-('AAPL','Apple Inc.','NASDAQ','stock','USD',TRUE),
-('MSFT','Microsoft Corporation','NASDAQ','stock','USD',TRUE),
-('NVDA','NVIDIA Corporation','NASDAQ','stock','USD',TRUE),
-('GOOGL','Alphabet Inc.','NASDAQ','stock','USD',TRUE),
-('AMZN','Amazon.com Inc.','NASDAQ','stock','USD',TRUE),
-('META','Meta Platforms Inc.','NASDAQ','stock','USD',TRUE),
-('TSLA','Tesla Inc.','NASDAQ','stock','USD',TRUE),
-('JPM','JPMorgan Chase & Co.','NYSE','stock','USD',TRUE);
-
-INSERT INTO watchlists (user_id, watchlist_name) VALUES (1, 'Default Watchlist');
-INSERT INTO watchlist_items (watchlist_id, instrument_id) VALUES (1,1),(1,2),(1,3);
+('AAPL', 'Apple Inc.', 'NASDAQ', 'stock', 'USD', TRUE),
+('MSFT', 'Microsoft Corporation', 'NASDAQ', 'stock', 'USD', TRUE),
+('NVDA', 'NVIDIA Corporation', 'NASDAQ', 'stock', 'USD', TRUE),
+('GOOGL', 'Alphabet Inc.', 'NASDAQ', 'stock', 'USD', TRUE),
+('AMZN', 'Amazon.com Inc.', 'NASDAQ', 'stock', 'USD', TRUE),
+('META', 'Meta Platforms Inc.', 'NASDAQ', 'stock', 'USD', TRUE),
+('TSLA', 'Tesla Inc.', 'NASDAQ', 'stock', 'USD', TRUE),
+('JPM', 'JPMorgan Chase & Co.', 'NYSE', 'stock', 'USD', TRUE);
 
 INSERT INTO buddy_categories (user_id, category_name, monthly_budget, color_hex) VALUES
-(1,'Food',900,'#007AFF'),(1,'Health',650,'#30D158'),(1,'Housing',1200,'#FF9500'),
-(1,'Utilities',420,'#FF3B30'),(1,'Transport',360,'#64D2FF'),
-(1,'Family',500,'#5856D6'),(1,'Leisure',300,'#8E8E93');
-
-INSERT INTO buddy_expenses (user_id, buddy_category_id, expense_name, amount, spent_on, notes) VALUES
-(1,1,'Groceries',84,'2026-07-31','Weekly food shopping'),
-(1,2,'Prescription refill',42,'2026-07-31','Monthly medication'),
-(1,4,'Electric bill',126,'2026-07-30','Utility payment'),
-(1,5,'Taxi to clinic',28,'2026-07-30','Medical transport'),
-(1,6,'Dinner with family',96,'2026-07-29','Family meal'),
-(1,3,'Gardening supplies',64,'2026-07-28','Home maintenance'),
-(1,7,'Movie tickets',34,'2026-07-27','Leisure outing'),
-(1,1,'Bakery and fruit',31,'2026-07-26','Daily food purchase'),
-(1,2,'Doctor copay',55,'2026-07-25','Clinic visit'),
-(1,4,'Water bill',48,'2026-07-24','Utility payment');
+(1, 'Food', 0, '#007AFF'),
+(1, 'Health', 0, '#30D158'),
+(1, 'Housing', 0, '#FF9500'),
+(1, 'Utilities', 0, '#FF3B30'),
+(1, 'Transport', 0, '#64D2FF'),
+(1, 'Family', 0, '#5856D6'),
+(1, 'Leisure', 0, '#8E8E93');

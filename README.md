@@ -5,15 +5,21 @@ from `main`. Authentication, portfolio values, Buddy expenses, and watchlists ar
 database-backed. Market quotes, history, comparison, and news use Massive or Alpha
 Vantage when keys are configured and otherwise return deterministic demo data.
 
-## Run locally without MySQL
+## One-command development startup
 
-The `dev` profile uses a temporary in-memory H2 database:
+The frontend is packaged into the Spring Boot application and the `dev` profile uses an embedded H2 database, so one command starts the database, backend, and frontend:
 
-```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```powershell
+.\run-dev.ps1
 ```
 
-Open Swagger UI at <http://localhost:8080/swagger-ui.html>. The generated OpenAPI
+On macOS/Linux, the equivalent command is:
+
+```bash
+SPRING_CONFIG_LOCATION=classpath:/ ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+Open the application at <http://localhost:8080/> and Swagger UI at <http://localhost:8080/swagger-ui.html>. The generated OpenAPI
 contract is available as JSON at <http://localhost:8080/v3/api-docs> and YAML at
 <http://localhost:8080/v3/api-docs.yaml>.
 
@@ -22,8 +28,10 @@ contract is available as JSON at <http://localhost:8080/v3/api-docs> and YAML at
 Start MySQL and create the schema:
 
 ```bash
-mysql -u root -p < database/tangent_schema_seed.sql
+mysql -u root -p < database/tangent_schema_minimal.sql
 ```
+
+`tangent_schema_minimal.sql` recreates the database and is intended for a clean installation. For an existing database created from the older full schema, take a backup and review/run `database/migrate_to_minimal.sql` instead.
 
 Create a dedicated application user from a MySQL session (replace the example password):
 
@@ -54,13 +62,14 @@ Then start the integrated frontend and backend:
 Environment variables from `.env.example` remain supported when running Maven
 directly. Spring Boot does not automatically load `.env` files.
 
-## Verify
+## Verify and build
 
 ```bash
 ./mvnw clean install
 ```
 
 Tests use an isolated H2 database and do not require a running MySQL server.
+The raw MySQL checks are in `DATABASE-VERIFICATION-GUIDE.md`; the complete manual lifecycle is in `E2E-TESTING.md`.
 
 The seeded development account is:
 

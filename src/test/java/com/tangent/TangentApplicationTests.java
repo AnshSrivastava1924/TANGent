@@ -2,6 +2,8 @@ package com.tangent;
 
 import com.tangent.dto.AuthRequest;
 import com.tangent.dto.AuthResponse;
+import com.tangent.dto.AssetCreateRequest;
+import com.tangent.dto.ExpenseCreateRequest;
 import com.tangent.dto.PortfolioBootstrapResponse;
 import com.tangent.service.AuthService;
 import com.tangent.service.PortfolioService;
@@ -9,6 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,7 +42,7 @@ class TangentApplicationTests {
     }
 
     @Test
-    void userCanRegisterLoginAndManageWatchlist() {
+    void userCanRegisterAndPersistAssetsExpensesAndWatchlist() {
         AuthResponse registration = authService.authenticate(
                 new AuthRequest("signup", "test@tangent.local", "Password123", "Test User"));
         AuthResponse login = authService.authenticate(
@@ -48,13 +53,25 @@ class TangentApplicationTests {
         long assetCount = workspace.portfolioClasses().stream()
                 .mapToLong(assetClass -> assetClass.items().size())
                 .sum();
+        long firstAssetClassId = workspace.portfolioClasses().get(0).classId();
+        portfolioService.createAsset(userId, new AssetCreateRequest(
+                "Retirement cash", firstAssetClassId, BigDecimal.ONE,
+                new BigDecimal("2500.50"), new BigDecimal("100.00")));
+        portfolioService.addExpense(userId, new ExpenseCreateRequest(
+                "Groceries", "Food", new BigDecimal("42.75"), LocalDate.of(2026, 8, 4)));
         portfolioService.addWatchSymbol(userId, "IBM");
-        var watchlist = portfolioService.bootstrap(userId).watchlist();
+        PortfolioBootstrapResponse updatedWorkspace = portfolioService.bootstrap(userId);
+        var watchlist = updatedWorkspace.watchlist();
 
         assertThat(registration.token()).isNotBlank();
         assertThat(login.token()).isNotBlank();
         assertThat(workspace.portfolioClasses()).isNotEmpty();
-        assertThat(assetCount).isEqualTo(10);
+        assertThat(assetCount).isZero();
+        assertThat(updatedWorkspace.portfolioClasses().stream()
+                .flatMap(assetClass -> assetClass.items().stream()))
+                .anySatisfy(asset -> assertThat(asset.value()).isEqualByComparingTo("2500.50"));
+        assertThat(updatedWorkspace.expenses())
+                .anySatisfy(expense -> assertThat(expense.amount()).isEqualByComparingTo("42.75"));
         assertThat(watchlist).contains("IBM");
     }
 }

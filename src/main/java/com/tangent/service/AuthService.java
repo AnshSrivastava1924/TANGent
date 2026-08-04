@@ -46,7 +46,8 @@ public class AuthService {
         String fullName = requestedName == null || requestedName.isBlank()
                 ? displayName(email) : requestedName.trim();
         long userId = users.createUser(email, passwordEncoder.encode(password), fullName);
-        portfolios.createStarterWorkspace(userId);
+        portfolios.getOrCreatePortfolio(userId);
+        portfolios.createDefaultExpenseCategories(userId);
         return response(new UserAccount(userId, email, "", fullName));
     }
 

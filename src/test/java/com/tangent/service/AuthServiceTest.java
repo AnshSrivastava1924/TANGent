@@ -72,7 +72,8 @@ class AuthServiceTest {
         assertThat(response.user().id()).isEqualTo(1L);
         assertThat(response.user().email()).isEqualTo("test@tangent.local");
         assertThat(response.user().fullName()).isEqualTo("Test User");
-        verify(portfolios, times(1)).createStarterWorkspace(1L);
+        verify(portfolios, times(1)).getOrCreatePortfolio(1L);
+        verify(portfolios, times(1)).createDefaultExpenseCategories(1L);
         verify(users, times(1)).existsByEmail("test@tangent.local");
         verify(users, times(1)).createUser("test@tangent.local", "hashed-password", "Test User");
     }
@@ -113,7 +114,7 @@ class AuthServiceTest {
                 .hasMessageContaining("already exists")
                 .satisfies(exception -> assertThat(((ApiException) exception).status()).isEqualTo(HttpStatus.CONFLICT));
 
-        verify(portfolios, never()).createStarterWorkspace(anyLong());
+        verify(portfolios, never()).getOrCreatePortfolio(anyLong());
         verify(users, never()).createUser(anyString(), anyString(), anyString());
     }
 

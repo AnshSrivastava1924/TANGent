@@ -1016,6 +1016,17 @@ canvas {
   padding: 20px;
 }
 
+.portfolio-entry-panel {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.portfolio-entry-panel > div,
+.portfolio-entry-panel .form-note {
+  grid-column: 1 / -1;
+}
+
 .expense-history {
   display: grid;
   gap: 10px;
@@ -1221,6 +1232,7 @@ th {
   .portfolio-grid,
   .insight-grid,
   .buddy-layout,
+  .portfolio-entry-panel,
   .news-list {
     grid-template-columns: 1fr;
   }

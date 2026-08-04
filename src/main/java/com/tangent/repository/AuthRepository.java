@@ -28,8 +28,8 @@ public class AuthRepository {
         jdbc.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO users
-                        (email, password_hash, full_name, risk_profile, base_currency, is_active, created_at, updated_at)
-                    VALUES (?, ?, ?, 'moderate', 'USD', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        (email, password_hash, full_name, is_active, created_at, updated_at)
+                    VALUES (?, ?, ?, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     """, new String[]{"user_id"});
             statement.setString(1, email);
             statement.setString(2, passwordHash);

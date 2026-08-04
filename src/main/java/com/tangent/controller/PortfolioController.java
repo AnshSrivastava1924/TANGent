@@ -1,5 +1,7 @@
 package com.tangent.controller;
 
+import com.tangent.dto.AssetCreateRequest;
+import com.tangent.dto.AssetCreateResponse;
 import com.tangent.dto.AssetUpdateRequest;
 import com.tangent.dto.ExpenseCreateRequest;
 import com.tangent.dto.ExpenseResponse;
@@ -40,11 +42,26 @@ public class PortfolioController {
         return ApiResponse.success(portfolioService.bootstrap(userId(authentication)));
     }
 
+    @PostMapping("/assets")
+    @Operation(summary = "Add a new asset to user's portfolio")
+    public ResponseEntity<ApiResponse<AssetCreateResponse>> createAsset(Authentication authentication,
+                                                                        @Valid @RequestBody AssetCreateRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Asset created", portfolioService.createAsset(userId(authentication), request)));
+    }
+
     @PutMapping("/assets/{assetId}")
     @Operation(summary = "Update a portfolio asset value and annual income")
     public ResponseEntity<Void> updateAsset(Authentication authentication, @PathVariable long assetId,
                                             @Valid @RequestBody AssetUpdateRequest request) {
         portfolioService.updateAsset(userId(authentication), assetId, request.value(), request.income());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/assets/{assetId}")
+    @Operation(summary = "Delete an asset from portfolio")
+    public ResponseEntity<Void> deleteAsset(Authentication authentication, @PathVariable long assetId) {
+        portfolioService.deleteAsset(userId(authentication), assetId);
         return ResponseEntity.noContent().build();
     }
 

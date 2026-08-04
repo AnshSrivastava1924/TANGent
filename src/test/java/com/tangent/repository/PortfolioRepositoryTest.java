@@ -112,7 +112,6 @@ class PortfolioRepositoryTest {
         when(assetRow.getString("asset_name")).thenReturn("Dividend ETF");
         when(assetRow.getBigDecimal("current_value")).thenReturn(new BigDecimal("10000"));
         when(assetRow.getBigDecimal("annual_income")).thenReturn(new BigDecimal("400"));
-        when(assetRow.getString("note")).thenReturn("Core holding");
         org.mockito.Mockito.doAnswer(invocation -> {
             RowCallbackHandler handler = invocation.getArgument(1);
             handler.processRow(assetRow);
@@ -328,18 +327,17 @@ class PortfolioRepositoryTest {
         repository = new PortfolioRepository(jdbc);
         stubGeneratedKey(999L);
 
-        repository.createStarterWorkspace(1L);
+        repository.getOrCreatePortfolio(1L);
 
-        verify(jdbc, times(10)).update(contains("INSERT INTO portfolio_assets"),
-                eq(999L), anyString(), any(), any(), any(), any(), any(), any());
-        verify(jdbc, times(7)).update(contains("INSERT INTO buddy_categories"), eq(1L), anyString());
+        verify(jdbc).query(contains("SELECT portfolio_id FROM portfolios"),
+                any(ResultSetExtractor.class), eq(1L));
     }
 
     @Test
     void should_throwInternalServerError_when_starterWorkspacePortfolioCreationGeneratesNoKey() {
         repository = new PortfolioRepository(jdbc);
 
-        assertThatThrownBy(() -> repository.createStarterWorkspace(1L))
+        assertThatThrownBy(() -> repository.getOrCreatePortfolio(1L))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("Unable to create portfolio");
     }

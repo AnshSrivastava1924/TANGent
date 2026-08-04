@@ -1,5 +1,6 @@
 package com.tangent.controller;
 
+import com.tangent.dto.AssetCreateResponse;
 import com.tangent.dto.ExpenseResponse;
 import com.tangent.dto.PortfolioBootstrapResponse;
 import com.tangent.dto.UserSummary;
@@ -132,6 +133,35 @@ class PortfolioControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.value").exists());
+    }
+
+    @Test
+    void should_returnCreated_when_assetAllocationIsValid() throws Exception {
+        when(portfolioService.createAsset(eq(USER_ID), any())).thenReturn(new AssetCreateResponse(
+                12L, "Retirement cash", "Cash", BigDecimal.ONE,
+                new BigDecimal("2500.50"), new BigDecimal("2500.50"), BigDecimal.ZERO));
+
+        mockMvc.perform(post("/api/app/assets").principal(authentication)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"assetName":"Retirement cash","assetClassId":1,
+                                 "quantity":1,"unitValue":2500.50,"annualIncome":0}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.assetId").value(12))
+                .andExpect(jsonPath("$.data.currentValue").value(2500.50));
+    }
+
+    @Test
+    void should_returnBadRequest_when_assetAllocationAmountIsZero() throws Exception {
+        mockMvc.perform(post("/api/app/assets").principal(authentication)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"assetName":"Retirement cash","assetClassId":1,
+                                 "quantity":1,"unitValue":0,"annualIncome":0}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.unitValue").exists());
     }
 
     @Test
