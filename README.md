@@ -1,89 +1,47 @@
 # TANGent Portfolio Manager
 
-This branch contains the integrated Spring Boot backend and the frontend imported
-from `main`. Authentication, portfolio values, Buddy expenses, and watchlists are
-database-backed. Market quotes, history, comparison, and news use Massive or Alpha
-Vantage when keys are configured and otherwise return deterministic demo data.
+TANGent is a full-stack portfolio management application built with a Spring Boot backend and an integrated frontend. It provides a clean experience for tracking holdings, monitoring watchlists, and viewing market-linked insights.
 
-## One-command development startup
+## Quick Start
 
-The frontend is packaged into the Spring Boot application and the `dev` profile uses an embedded H2 database, so one command starts the database, backend, and frontend:
+Run the application in development mode:
+
+```bash
+./mvnw spring-boot:run
+```
+
+Or on Windows PowerShell:
 
 ```powershell
 .\run-dev.ps1
 ```
 
-On macOS/Linux, the equivalent command is:
+Open the app at <http://localhost:8080/>.
 
-```bash
-SPRING_CONFIG_LOCATION=classpath:/ ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-```
+## Features
 
-Open the application at <http://localhost:8080/> and Swagger UI at <http://localhost:8080/swagger-ui.html>. The generated OpenAPI
-contract is available as JSON at <http://localhost:8080/v3/api-docs> and YAML at
-<http://localhost:8080/v3/api-docs.yaml>.
+- User authentication and secure session handling
+- Portfolio tracking with current value insights
+- Watchlist management for selected symbols
+- Buddy expense and shared tracking support
+- Market quote, history, comparison, and news integration
+- Swagger/OpenAPI documentation for backend APIs
 
-## Run with MySQL
+## API Docs
 
-Start MySQL and create the schema:
+- Swagger UI: <http://localhost:8080/swagger-ui.html>
+- OpenAPI JSON: <http://localhost:8080/v3/api-docs>
+- OpenAPI YAML: <http://localhost:8080/v3/api-docs.yaml>
 
-```bash
-mysql -u root -p < database/tangent_schema_minimal.sql
-```
-
-`tangent_schema_minimal.sql` recreates the database and is intended for a clean installation. For an existing database created from the older full schema, take a backup and review/run `database/migrate_to_minimal.sql` instead.
-
-Create a dedicated application user from a MySQL session (replace the example password):
-
-```sql
-CREATE USER IF NOT EXISTS 'tangent_app'@'localhost' IDENTIFIED BY 'your-password';
-GRANT ALL PRIVILEGES ON tangent_db.* TO 'tangent_app'@'localhost';
-FLUSH PRIVILEGES;
-```
-
-For a local machine, create `config/application.properties` (this path is ignored
-by Git) with the matching values:
-
-```properties
-spring.datasource.url=jdbc:mysql://127.0.0.1:3306/tangent_db
-spring.datasource.username=tangent_app
-spring.datasource.password=your-password
-jwt.secret=a-random-secret-with-at-least-32-characters
-market.massive.api-key=your-key
-market.alpha-vantage.api-key=your-key
-```
-
-Then start the integrated frontend and backend:
-
-```bash
-./run.sh
-```
-
-Environment variables from `.env.example` remain supported when running Maven
-directly. Spring Boot does not automatically load `.env` files.
-
-## Verify and build
+## Build and Test
 
 ```bash
 ./mvnw clean install
 ```
 
-Tests use an isolated H2 database and do not require a running MySQL server.
-The raw MySQL checks are in `DATABASE-VERIFICATION-GUIDE.md`; the complete manual lifecycle is in `E2E-TESTING.md`.
+Tests run on an isolated in-memory setup and do not require external database configuration.
 
-The seeded development account is:
-
-```text
-student@tangent.local
-training123
-```
-
-The application itself is available at <http://localhost:8080/>.
-
-## Backend architecture
-
-The backend is a traditional layered monolith. It deploys as one Spring Boot
-application connected to one MySQL database:
+## Project Structure
 
 ```text
 src/main/java/com/tangent
@@ -99,26 +57,7 @@ src/main/java/com/tangent
 └── wrapper
 ```
 
-Controllers expose HTTP endpoints and validation, DTOs define API contracts,
-services contain business rules and transaction boundaries, repositories own
-SQL/database access, constants hold shared immutable values, and wrappers define
-the common API envelope. Successful JSON endpoints use `ApiResponse<T>`; failures
-use the matching typed error response from the global exception handler.
+## Notes
 
-## Market provider keys
-
-Set one or both keys before starting the application:
-
-```bash
-export MASSIVE_API_KEY="your-key"
-export ALPHA_VANTAGE_API_KEY="your-key"
-```
-
-Massive is preferred for quotes, aggregates, and news. Alpha Vantage is used as a
-fallback. The backend never invents stock prices: if configured providers reject
-a key, exceed a rate limit, or lack endpoint entitlement, the API returns `503`
-with the provider reason. Responses include `provider` and `freshness` fields.
-
-Live exchange data depends on the provider subscription. To request a paid Alpha
-Vantage entitlement, set `ALPHA_VANTAGE_ENTITLEMENT=realtime` (or `delayed`).
-Without it, Alpha Vantage documents its quote response as end-of-day data.
+- Environment variables can be used for secrets and external provider keys.
+- Keep local runtime configuration and secrets out of version control.
