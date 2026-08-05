@@ -20,7 +20,6 @@ Open the app at <http://localhost:8080/>.
 
 ## Features
 
-- User authentication and secure session handling
 - Portfolio tracking with current value insights
 - Watchlist management for selected symbols
 - Buddy expense and shared tracking support
