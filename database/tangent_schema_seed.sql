@@ -1,9 +1,9 @@
 -- TANGent MySQL schema and seed data
 -- Run with: mysql -u <user> -p < database/tangent_schema_seed.sql
 
-DROP DATABASE IF EXISTS tangent_db;
-CREATE DATABASE tangent_db CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-USE tangent_db;
+DROP DATABASE IF EXISTS tangent_database;
+CREATE DATABASE tangent_database CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+USE tangent_database;
 
 CREATE TABLE users (
   user_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

@@ -1,9 +1,9 @@
 -- TANGent canonical schema for a clean MySQL 8 installation.
--- WARNING: this bootstrap recreates tangent_db. Use migrate_to_minimal.sql for an existing database.
+-- WARNING: this bootstrap recreates tangent_database. Use migrate_to_minimal.sql for an existing database.
 
-DROP DATABASE IF EXISTS tangent_db;
-CREATE DATABASE tangent_db CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-USE tangent_db;
+DROP DATABASE IF EXISTS tangent_database;
+CREATE DATABASE tangent_database CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+USE tangent_database;
 
 -- ============================================
 -- CORE USER MANAGEMENT

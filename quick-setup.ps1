@@ -19,7 +19,7 @@ try {
     $userSql = @"
 CREATE USER IF NOT EXISTS 'tangent_app'@'localhost' IDENTIFIED BY '$appPassword';
 ALTER USER 'tangent_app'@'localhost' IDENTIFIED BY '$appPassword';
-GRANT SELECT, INSERT, UPDATE, DELETE ON tangent_db.* TO 'tangent_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON tangent_database.* TO 'tangent_app'@'localhost';
 FLUSH PRIVILEGES;
 "@
     $userSql | & mysql -u root "--password=$rootPasswordText"
@@ -27,7 +27,7 @@ FLUSH PRIVILEGES;
 
     New-Item -ItemType Directory -Path ".\config" -Force | Out-Null
     $config = @"
-spring.datasource.url=jdbc:mysql://127.0.0.1:3306/tangent_db?useSSL=false&serverTimezone=UTC
+spring.datasource.url=jdbc:mysql://127.0.0.1:3306/tangent_database?useSSL=false&serverTimezone=UTC
 spring.datasource.username=tangent_app
 spring.datasource.password=$appPassword
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
@@ -40,7 +40,7 @@ logging.level.com.tangent=INFO
     $config | Out-File ".\config\application.properties" -Encoding utf8
 
     $count = "SELECT COUNT(*) FROM users;" |
-        & mysql -u tangent_app "--password=$appPassword" -D tangent_db -s -N
+        & mysql -u tangent_app "--password=$appPassword" -D tangent_database -s -N
     if ($LASTEXITCODE -ne 0) { throw "Application database connection check failed" }
 
     Write-Host "Setup complete. Database connection verified with $count user(s)." -ForegroundColor Green

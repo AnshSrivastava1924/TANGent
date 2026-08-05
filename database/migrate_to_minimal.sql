@@ -1,6 +1,6 @@
 -- Migration from database/tangent_schema_seed.sql to the lean application schema.
--- Back up tangent_db before running. This intentionally removes objects proven unused by src/ and public/.
-USE tangent_db;
+-- Back up tangent_database before running. This intentionally removes objects proven unused by src/ and public/.
+USE tangent_database;
 
 -- Preserve a useful legacy identifier as the optional ticker before removing metadata columns.
 ALTER TABLE portfolio_assets ADD COLUMN symbol VARCHAR(30) NULL AFTER asset_name;
